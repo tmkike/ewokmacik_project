@@ -1,0 +1,142 @@
+[
+{
+"title": "1984",
+"author": "George Orwell",
+"year": 1949,
+"genre": "Dystopian",
+"available": true
+},
+{
+"title": "To Kill a Mockingbird",
+"author": "Harper Lee",
+"year": 1960,
+"genre": "Fiction",
+"available": true
+},
+{
+"title": "The Great Gatsby",
+"author": "F. Scott Fitzgerald",
+"year": 1925,
+"genre": "Classic",
+"available": true
+},
+{
+"title": "Moby Dick",
+"author": "Herman Melville",
+"year": 1851,
+"genre": "Adventure",
+"available": true
+},
+{
+"title": "Pride and Prejudice",
+"author": "Jane Austen",
+"year": 1813,
+"genre": "Romance",
+"available": true
+},
+{
+"title": "War and Peace",
+"author": "Leo Tolstoy",
+"year": 1869,
+"genre": "Historical",
+"available": true
+},
+{
+"title": "The Hobbit",
+"author": "J.R.R. Tolkien",
+"year": 1937,
+"genre": "Fantasy",
+"available": true
+},
+{
+"title": "The Catcher in the Rye",
+"author": "J.D. Salinger",
+"year": 1951,
+"genre": "Fiction",
+"available": true
+},
+{
+"title": "Brave New World",
+"author": "Aldous Huxley",
+"year": 1932,
+"genre": "Dystopian",
+"available": true
+},
+{
+"title": "The Lord of the Rings",
+"author": "J.R.R. Tolkien",
+"year": 1954,
+"genre": "Fantasy",
+"available": true
+},
+{
+"title": "Crime and Punishment",
+"author": "Fyodor Dostoevsky",
+"year": 1866,
+"genre": "Psychological",
+"available": true
+},
+{
+"title": "The Brothers Karamazov",
+"author": "Fyodor Dostoevsky",
+"year": 1880,
+"genre": "Philosophical",
+"available": true
+},
+{
+"title": "Anna Karenina",
+"author": "Leo Tolstoy",
+"year": 1877,
+"genre": "Drama",
+"available": true
+},
+{
+"title": "The Alchemist",
+"author": "Paulo Coelho",
+"year": 1988,
+"genre": "Adventure",
+"available": true
+},
+{
+"title": "Harry Potter and the Philosopher's Stone",
+"author": "J.K. Rowling",
+"year": 1997,
+"genre": "Fantasy",
+"available": true
+},
+{
+"title": "The Da Vinci Code",
+"author": "Dan Brown",
+"year": 2003,
+"genre": "Thriller",
+"available": true
+},
+{
+"title": "The Hunger Games",
+"author": "Suzanne Collins",
+"year": 2008,
+"genre": "Dystopian",
+"available": true
+},
+{
+"title": "The Shining",
+"author": "Stephen King",
+"year": 1977,
+"genre": "Horror",
+"available": true
+},
+{
+"title": "Dune",
+"author": "Frank Herbert",
+"year": 1965,
+"genre": "Science Fiction",
+"available": true
+},
+{
+"title": "Fahrenheit 451",
+"author": "Ray Bradbury",
+"year": 1953,
+"genre": "Dystopian",
+"available": true
+}
+]

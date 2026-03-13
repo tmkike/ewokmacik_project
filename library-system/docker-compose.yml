@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+
+  mongodb:
+    image: mongo:8
+    container_name: library-mongodb
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - ./database/seed:/docker-entrypoint-initdb.d
