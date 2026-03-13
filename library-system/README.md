@@ -64,4 +64,30 @@ library-system
   └ seed
      ├ books.json
      └ init.sh
+`
+
+``## Kubernetes deployment
+
+Create namespace:
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+```
+
+Deploy MongoDB:
+
+```bash
+kubectl apply -f k8s/mongodb-deployment.yaml
+```
+
+Create service:
+
+```bash
+kubectl apply -f k8s/mongodb-service.yaml
+```
+
+Check pods:
+
+```bash
+kubectl get pods
 ```
