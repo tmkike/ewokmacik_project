@@ -28,7 +28,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t ghcr.io/${{ github.repository }}/mongodb:latest .
+        docker build -t ghcr.io/${{ github.repository }}/mongodb:latest ./library-system
 
     - name: Push Docker image
       run: |
