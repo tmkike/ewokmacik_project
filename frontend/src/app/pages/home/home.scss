@@ -1,0 +1,61 @@
+.home-welcome {
+  min-height: 100vh;
+  background-color: #f3e8d7;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 20px;
+  box-sizing: border-box;
+}
+
+.welcome-card {
+  width: 100%;
+  max-width: 1100px;
+  background-color: #fcf7f0;
+  border-radius: 24px;
+  padding: 48px 56px;
+  box-shadow: 0 8px 24px rgba(80, 50, 30, 0.12);
+  color: #4e342e;
+}
+
+.welcome-card h1 {
+  font-size: 2.4rem;
+  margin-bottom: 28px;
+  color: #4e342e;
+}
+
+.welcome-card h2 {
+  font-size: 1.8rem;
+  margin-top: 36px;
+  margin-bottom: 18px;
+  color: #5d4037;
+}
+
+.welcome-card p {
+  font-size: 1.2rem;
+  line-height: 1.8;
+  margin-bottom: 22px;
+  color: #5c4033;
+}
+
+.welcome-card ul {
+  padding-left: 24px;
+  margin-bottom: 24px;
+}
+
+.welcome-card li {
+  font-size: 1.15rem;
+  line-height: 1.7;
+  margin-bottom: 14px;
+  color: #5c4033;
+}
+
+.intro {
+  font-size: 1.25rem;
+}
+
+.closing {
+  margin-top: 28px;
+  font-weight: 600;
+  color: #4e342e;
+}

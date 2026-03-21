@@ -3,19 +3,21 @@ import { MainLayout } from './layout/main-layout/main-layout';
 import { Home } from './pages/home/home';
 import { Books } from './pages/books/books';
 import { Contact } from './pages/contact/contact';
-import { Login } from './pages/login/login';
-import { Registration } from './pages/registration/registration';
+import { Mod } from './pages/mod/mod';
+import { Add } from './pages/add/add';
 
 export const routes: Routes = [
   {
     path: '',
     component: MainLayout,
     children: [
+      { path: '', redirectTo: 'home', pathMatch: 'full' },
       { path: 'home', component: Home },
       { path: 'books', component: Books },
       { path: 'contact', component: Contact },
-      { path: 'login', component: Login },
-      { path: 'registration', component: Registration }
+      { path: 'mod', component: Mod },
+      { path: 'add', component: Add }
     ]
-  }
+  },
+  { path: '**', redirectTo: 'home' }
 ];
