@@ -1,22 +1,58 @@
 <section class="books-page">
   <div class="books-card">
-    <h1>Könyvek listája</h1>
-    <p class="intro">Itt tekintheted meg a könyvtár nyilvántartásában szereplő könyveket.</p>
+    <div class="page-header">
+      <div>
+        <h1>Könyvek listája</h1>
+        <p class="intro">Kattints egy könyvre a szerkesztéshez vagy törléshez.</p>
+      </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Cím</th>
-          <th>Szerző</th>
-          <th>Kiadás éve</th>
-          <th>Kategória</th>
-          <th>Elérhető</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-        </tr>
-      </tbody>
-    </table>
+      <a class="add-button" routerLink="/add">Új könyv hozzáadása</a>
+    </div>
+
+    <form class="filters" (ngSubmit)="applyFilters()">
+      <label>
+        Cím
+        <input type="text" name="title" placeholder="Cím" [(ngModel)]="filters.title" />
+      </label>
+
+      <label>
+        Szerző
+        <input type="text" name="author" placeholder="Szerző" [(ngModel)]="filters.author" />
+      </label>
+
+      <label>
+        Kategória
+        <input type="text" name="genre" placeholder="Kategória" [(ngModel)]="filters.genre" />
+      </label>
+
+      <label>
+        Elérhetőség
+        <select name="available" [(ngModel)]="filters.available">
+          <option [ngValue]="''">Mind</option>
+          <option [ngValue]="true">Elérhető</option>
+          <option [ngValue]="false">Nem elérhető</option>
+        </select>
+      </label>
+
+      <button type="submit">Keresés</button>
+      <button type="button" (click)="clearFilters()">Szűrők törlése</button>
+    </form>
+
+    <p class="status" *ngIf="loading">Könyvek betöltése...</p>
+    <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+    <ul class="book-list" *ngIf="!loading && books.length > 0" aria-label="Könyvek">
+      <li *ngFor="let book of books">
+        <button type="button" class="book-list-item" (click)="openBook(book)">
+          <span class="book-title">{{ book.title }}</span>
+          <span class="book-meta">{{ book.author }} - {{ book.year }} - {{ book.genre }}</span>
+          <span class="availability">{{ book.available ? 'Elérhető' : 'Nem elérhető' }}</span>
+        </button>
+      </li>
+    </ul>
+
+    <p class="status" *ngIf="!loading && books.length === 0 && !errorMessage">
+      Nincs megjeleníthető könyv.
+    </p>
   </div>
 </section>

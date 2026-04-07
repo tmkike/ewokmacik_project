@@ -1,13 +1,21 @@
-.book-form-card {
+.book-detail-card {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   margin: 2rem auto;
-  max-width: 700px;
+  max-width: 760px;
   padding: 2rem;
 }
 
-form {
+.back-link {
+  color: #5b3f2a;
+  display: inline-block;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  text-decoration: none;
+}
+
+.edit-form {
   display: grid;
   gap: 1rem;
 }
@@ -30,6 +38,10 @@ button {
   cursor: pointer;
 }
 
+button.danger {
+  background: #9f1d1d;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -40,10 +52,20 @@ button:disabled {
   display: flex;
 }
 
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .success {
   color: #157347;
 }
 
 .error {
   color: #b00020;
+}
+
+.status {
+  color: #5b3f2a;
 }

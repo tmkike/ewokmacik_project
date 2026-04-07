@@ -1,1 +1,69 @@
-<p>mod works!</p>
+<section class="mod-page">
+  <div class="mod-card">
+    <h1>Konyvek modositasa es torlese</h1>
+
+    <p class="status" *ngIf="loading">Konyvek betoltese...</p>
+    <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+    <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+    <table *ngIf="!loading && books.length > 0">
+      <thead>
+        <tr>
+          <th>Cim</th>
+          <th>Szerzo</th>
+          <th>Elerheto</th>
+          <th>Muveletek</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let book of books">
+          <td>{{ book.title }}</td>
+          <td>{{ book.author }}</td>
+          <td>{{ book.available ? 'Igen' : 'Nem' }}</td>
+          <td class="actions">
+            <button type="button" (click)="selectBook(book)">Szerkesztes</button>
+            <button type="button" (click)="toggleAvailability(book)">
+              {{ book.available ? 'Nem elerheto' : 'Elerheto' }}
+            </button>
+            <button type="button" class="danger" (click)="deleteBook(book)">Torles</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="status" *ngIf="!loading && books.length === 0">Nincs modositando konyv.</p>
+
+    <form *ngIf="selectedBook" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
+      <h2>Kivalasztott konyv szerkesztese</h2>
+
+      <label>
+        Cim
+        <input type="text" name="title" required [(ngModel)]="selectedBook.title" />
+      </label>
+
+      <label>
+        Szerzo
+        <input type="text" name="author" required [(ngModel)]="selectedBook.author" />
+      </label>
+
+      <label>
+        Kiadas eve
+        <input type="number" name="year" required min="0" [(ngModel)]="selectedBook.year" />
+      </label>
+
+      <label>
+        Kategoria
+        <input type="text" name="genre" required [(ngModel)]="selectedBook.genre" />
+      </label>
+
+      <label class="checkbox-row">
+        <input type="checkbox" name="available" [(ngModel)]="selectedBook.available" />
+        Elerheto
+      </label>
+
+      <button type="submit" [disabled]="editForm.invalid || saving">
+        {{ saving ? 'Mentes...' : 'Mentes' }}
+      </button>
+    </form>
+  </div>
+</section>

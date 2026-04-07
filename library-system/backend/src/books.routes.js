@@ -25,6 +25,10 @@ function buildBooksFilter(query) {
     ];
   }
 
+  if (query.title) {
+    filter.title = new RegExp(escapeRegExp(query.title), 'i');
+  }
+
   if (query.genre) {
     filter.genre = new RegExp(`^${escapeRegExp(query.genre)}$`, 'i');
   }
