@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: library-system
+
+resources:
+  - namespace.yaml
+  - book-mongodb-pvc.yaml
+  - book-mongodb-deployment.yaml
+  - book-mongodb-service.yaml
+  - loan-mongodb-pvc.yaml
+  - loan-mongodb-deployment.yaml
+  - loan-mongodb-service.yaml
+  - book-service-deployment.yaml
+  - book-service-service.yaml
+  - loan-service-deployment.yaml
+  - loan-service-service.yaml
+  - api-gateway-deployment.yaml
+  - api-gateway-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+
+configMapGenerator:
+  - name: api-gateway-config
+    files:
+      - nginx.conf=api-gateway-nginx.conf
+  - name: book-mongodb-seed
+    files:
+      - books.json=config/book-seed/books.json
+      - init.sh=config/book-seed/init.sh
+
+generatorOptions:
+  disableNameSuffixHash: true

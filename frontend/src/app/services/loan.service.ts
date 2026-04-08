@@ -9,7 +9,7 @@ import { Loan, LoanCreatePayload, LoanReturnPayload } from '../models/loan';
 })
 export class LoanService {
   // A kölcsönzési műveletek külön REST végponton érhetők el.
-  private readonly apiUrl = 'http://localhost:3000/api/loans';
+  private readonly apiUrl = '/api/loans';
 
   constructor(private readonly http: HttpClient) {}
 

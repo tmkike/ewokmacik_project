@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loan-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loan-service
+  template:
+    metadata:
+      labels:
+        app: loan-service
+    spec:
+      containers:
+        - name: loan-service
+          image: ghcr.io/tmkike/ewokmacik_project-loan-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: MONGODB_URI
+              value: mongodb://loan-mongodb:27017
+            - name: MONGODB_DB
+              value: loans
+            - name: BOOK_SERVICE_URL
+              value: http://book-service:3001
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 10

@@ -122,4 +122,35 @@ A `loan-service` kulon ures adatbazissal indul, es a kolcsonzeseket mar csak a s
 
 ## Kubernetes
 
-A `k8s` mappaban jelenleg a korabbi MongoDB manifestek vannak. Ha szeretned, a kovetkezo korben ezt is szetbontom kulon `book-service`, `loan-service`, `api-gateway`, `book-mongodb` es `loan-mongodb` deployment/service manifestekre.
+A `k8s` mappa most mar a teljes jelenlegi architekturahoz tartalmaz manifesteket:
+
+- `frontend`
+- `api-gateway`
+- `book-service`
+- `loan-service`
+- `book-mongodb`
+- `loan-mongodb`
+
+A javasolt telepitesi mod:
+
+```bash
+kubectl apply -k library-system/k8s
+```
+
+Vagy ha mar a `library-system` mappaban vagy:
+
+```bash
+kubectl apply -k k8s
+```
+
+A `frontend` Kubernetesben is ugyanazon az originen keresztul hivja az API-t, a `/api` utvonalakat az Nginx a clusteren beluli `api-gateway` service fele proxyzza.
+
+Az image-ek, amikre a manifestek mutatnak:
+
+```text
+ghcr.io/tmkike/ewokmacik_project-frontend:latest
+ghcr.io/tmkike/ewokmacik_project-book-service:latest
+ghcr.io/tmkike/ewokmacik_project-loan-service:latest
+```
+
+Ha a GHCR csomagok privatkent vannak beallitva, szukseged lesz egy `imagePullSecret`-re is a clusterben. Az ArgoCD alkalmazas manifest mar a teljes `k8s` konyvtarra mutat, es `CreateNamespace=true` sync optiont is kapott.

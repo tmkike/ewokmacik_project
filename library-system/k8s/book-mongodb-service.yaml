@@ -1,12 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongodb-service
+  name: book-mongodb
 spec:
   selector:
-    app: mongodb
+    app: book-mongodb
   ports:
-    - protocol: TCP
+    - name: mongodb
+      protocol: TCP
       port: 27017
       targetPort: 27017
-  type: NodePort
+  type: ClusterIP

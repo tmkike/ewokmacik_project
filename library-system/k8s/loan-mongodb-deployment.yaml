@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loan-mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loan-mongodb
+  template:
+    metadata:
+      labels:
+        app: loan-mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:8
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_DATABASE
+              value: loans
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: loan-mongodb-pvc

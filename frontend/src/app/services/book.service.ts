@@ -9,7 +9,7 @@ import { Book, BookFilters } from '../models/book';
 })
 export class BookService {
   // A frontend minden könyves műveletet ezen az egy REST végponton keresztül intéz.
-  private readonly apiUrl = 'http://localhost:3000/api/books';
+  private readonly apiUrl = '/api/books';
 
   constructor(private readonly http: HttpClient) {}
 
