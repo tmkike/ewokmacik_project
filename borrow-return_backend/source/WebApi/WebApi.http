@@ -1,0 +1,53 @@
+@WebApi_HostAddress = http://localhost:5056
+@bookId =
+@loanId =
+
+### Get all books
+GET {{WebApi_HostAddress}}/api/books
+
+### Get one book
+GET {{WebApi_HostAddress}}/api/books/{{bookId}}
+
+### Create a book
+POST {{WebApi_HostAddress}}/api/books
+Content-Type: application/json
+
+{
+  "title": "",
+  "author": "",
+  "year": 0,
+  "genre": ""
+}
+
+### Update a book
+PUT {{WebApi_HostAddress}}/api/books/{{bookId}}
+Content-Type: application/json
+
+{
+  "title": "",
+  "author": "",
+  "year": 0,
+  "genre": ""
+}
+
+### Delete a book
+DELETE {{WebApi_HostAddress}}/api/books/{{bookId}}
+
+### Get all loans
+GET {{WebApi_HostAddress}}/api/loans
+
+### Get active loans
+GET {{WebApi_HostAddress}}/api/loans/active
+
+### Create a loan
+POST {{WebApi_HostAddress}}/api/loans
+Content-Type: application/json
+
+{
+  "bookId": "",
+  "userName": "",
+  "borrowDate": ""
+}
+
+### Return a loan
+PUT {{WebApi_HostAddress}}/api/loans/{{loanId}}/return

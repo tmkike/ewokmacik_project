@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "FOM/U57a/Bc=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\szab1\\Desktop\\könyvtár\\source\\Domain\\Domain.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\szab1\\.nuget\\packages\\mongodb.bson\\3.2.1\\mongodb.bson.3.2.1.nupkg.sha512",
+    "C:\\Users\\szab1\\.nuget\\packages\\system.memory\\4.5.5\\system.memory.4.5.5.nupkg.sha512",
+    "C:\\Users\\szab1\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\5.0.0\\system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
