@@ -113,6 +113,29 @@ button {
   font-size: 0.9rem;
 }
 
+.availability {
+  border-radius: 999px;
+  display: inline-flex;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  width: fit-content;
+}
+
+.availability--available {
+  background: #e7f6ec;
+  color: #157347;
+}
+
+.availability--loaned {
+  background: #fff0d9;
+  color: #9a5c00;
+}
+
+.availability--unavailable {
+  background: #f3e6dd;
+  color: #7a4131;
+}
+
 .error {
   color: #b00020;
 }

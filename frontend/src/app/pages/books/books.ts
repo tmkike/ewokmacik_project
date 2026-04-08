@@ -94,6 +94,24 @@ export class Books implements OnInit, OnDestroy {
     });
   }
 
+  getBookAvailabilityLabel(book: Book): string {
+    if (book.hasActiveLoan) {
+      return 'Kikolcsonozve';
+    }
+
+    return book.available ? 'Elerheto' : 'Nem elerheto';
+  }
+
+  getBookAvailabilityClass(book: Book): string {
+    if (book.hasActiveLoan) {
+      return 'availability availability--loaned';
+    }
+
+    return book.available
+      ? 'availability availability--available'
+      : 'availability availability--unavailable';
+  }
+
   private refreshBooks(resetFilters: boolean): void {
     if (resetFilters) {
       // Visszanavigáláskor mindig teljes listával, alap szűrőkkel indulunk.

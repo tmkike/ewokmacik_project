@@ -15,6 +15,7 @@
     <p class="status" *ngIf="bookId && !book && !loading && !errorMessage">
       Nincs betöltött könyv ehhez az azonosítóhoz: {{ bookId }}
     </p>
+
     <div
       *ngIf="successMessage"
       class="system-message system-message--success"
@@ -23,6 +24,7 @@
     >
       <strong>Sikeres művelet:</strong> {{ successMessage }}
     </div>
+
     <div
       *ngIf="errorMessage"
       class="system-message system-message--error"
@@ -34,6 +36,7 @@
 
     <form *ngIf="book" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
       <h1>{{ book.title }}</h1>
+      <p class="book-status">{{ bookStatusLabel }}</p>
 
       <fieldset class="edit-fieldset" [disabled]="saving || loanProcessing">
         <label>
@@ -57,7 +60,12 @@
         </label>
 
         <label class="checkbox-row">
-          <input type="checkbox" name="available" [(ngModel)]="book.available" />
+          <input
+            type="checkbox"
+            name="available"
+            [(ngModel)]="book.available"
+            [disabled]="isAvailabilityToggleDisabled"
+          />
           Elérhető
         </label>
 
@@ -96,8 +104,38 @@
         A könyv jelenleg ki van kölcsönözve. A kölcsönzési adatok csak olvashatók.
       </p>
 
+      <p class="status" *ngIf="!loanLoading && !activeLoan && book.available">
+        A konyv jelenleg elerheto. Uj kolcsonzes indithato.
+      </p>
+
+      <div class="loan-summary" *ngIf="activeLoan">
+        <label class="loan-readonly-field">
+          <span class="label-text">Kolcsonzo neve</span>
+          <span class="loan-readonly-value">{{ activeLoan.borrowerName }}</span>
+        </label>
+
+        <label class="loan-readonly-field">
+          <span class="label-text">Kolcsonzo e-mail cime</span>
+          <span class="loan-readonly-value">{{ activeLoan.borrowerEmail || 'Nincs megadva' }}</span>
+        </label>
+
+        <label class="loan-readonly-field">
+          <span class="label-text">Hatarido</span>
+          <span class="loan-readonly-value">{{ formatLoanDateLabel(activeLoan.dueAt) }}</span>
+        </label>
+
+        <label class="loan-readonly-field">
+          <span class="label-text">Megjegyzes</span>
+          <span class="loan-readonly-value loan-readonly-value--multiline">
+            {{ activeLoan.notes || 'Nincs megjegyzes' }}
+          </span>
+        </label>
+      </div>
+
       <form
+        *ngIf="!activeLoan"
         class="loan-form"
+        novalidate
         (ngSubmit)="saveLoan()"
         #loanFormRef="ngForm"
       >
@@ -129,10 +167,15 @@
             type="date"
             name="dueAt"
             required
+            [min]="minimumLoanDueDate"
             [(ngModel)]="loanForm.dueAt"
             [disabled]="isLoanFormReadOnly"
           />
         </label>
+
+        <p class="status" *ngIf="!isLoanFormReadOnly">
+          A határidő legkorábban {{ minimumLoanDueDateLabel }} lehet.
+        </p>
 
         <label>
           <span class="label-text">Megjegyzés</span>
@@ -147,14 +190,18 @@
         <div class="form-actions" *ngIf="canCreateLoan">
           <button
             type="submit"
-            [disabled]="loanFormRef.invalid || loanLoading || loanProcessing || saving || !canCreateLoan"
+            [disabled]="loanLoading || loanProcessing || saving || !canCreateLoan"
           >
             Kölcsönzés indítása
           </button>
         </div>
       </form>
 
-      <p class="status" *ngIf="!loanLoading && !activeLoan && !book.available">
+      <p class="status" *ngIf="!loanLoading && !activeLoan && !book.available && book.hasActiveLoan">
+        A konyv jelenleg kikolcsonozve, de a reszletek most nem erhetoek el.
+      </p>
+
+      <p class="status" *ngIf="!loanLoading && !activeLoan && !book.available && !book.hasActiveLoan">
         A könyv jelenleg nem elérhető.
       </p>
     </section>

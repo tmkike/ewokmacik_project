@@ -102,7 +102,9 @@ static async Task<IResult> GetBooksAsync(HttpRequest request, MongoDbContext db,
         .Sort(Builders<BsonDocument>.Sort.Ascending("title"))
         .ToListAsync(cancellationToken);
 
-    return Results.Ok(books.Select(MapBookResponse));
+    var activeLoanBookIds = await GetActiveLoanBookIdsAsync(db, cancellationToken);
+
+    return Results.Ok(books.Select(book => MapBookResponse(book, activeLoanBookIds.Contains(GetId(book)))));
 }
 
 static async Task<IResult> GetBookByIdAsync(string id, MongoDbContext db, CancellationToken cancellationToken)
@@ -129,7 +131,7 @@ static async Task<IResult> CreateBookAsync(BookUpsertRequest? request, MongoDbCo
 {
     var validationResult = ValidateBookPayload(request);
 
-    if (validationResult.Errors.Count > 0)
+    if (validationResult.Errors.Length > 0)
     {
         return Results.BadRequest(new ValidationErrorResponse("Érvénytelen könyvadatok.", validationResult.Errors));
     }
@@ -158,7 +160,7 @@ static async Task<IResult> UpdateBookAsync(string id, BookUpsertRequest? request
 
     var validationResult = ValidateBookPayload(request);
 
-    if (validationResult.Errors.Count > 0)
+    if (validationResult.Errors.Length > 0)
     {
         return Results.BadRequest(new ValidationErrorResponse("Érvénytelen könyvadatok.", validationResult.Errors));
     }
@@ -285,7 +287,7 @@ static async Task<IResult> CreateLoanAsync(LoanCreateRequest? request, MongoDbCo
 {
     var validationResult = ValidateLoanCreatePayload(request);
 
-    if (validationResult.Errors.Count > 0)
+    if (validationResult.Errors.Length > 0)
     {
         return Results.BadRequest(new ValidationErrorResponse("Érvénytelen kölcsönzési adatok.", validationResult.Errors));
     }
@@ -346,7 +348,7 @@ static async Task<IResult> UpdateLoanAsync(string id, LoanUpdateRequest? request
 
     var validationResult = ValidateLoanUpdatePayload(request);
 
-    if (validationResult.Errors.Count > 0)
+    if (validationResult.Errors.Length > 0)
     {
         return Results.BadRequest(new ValidationErrorResponse("Érvénytelen kölcsönzési adatok.", validationResult.Errors));
     }
@@ -373,6 +375,10 @@ static async Task<IResult> UpdateLoanAsync(string id, LoanUpdateRequest? request
         return Results.BadRequest(new ErrorResponse("A határidő nem lehet korábbi, mint a kölcsönzés dátuma."));
     }
 
+    BsonValue notesValue = payload.Notes is null
+        ? BsonNull.Value
+        : new BsonString(payload.Notes);
+
     var updatedLoan = await db.Loans.FindOneAndUpdateAsync(
         Builders<BsonDocument>.Filter.And(
             Builders<BsonDocument>.Filter.Eq("_id", loanId),
@@ -380,7 +386,7 @@ static async Task<IResult> UpdateLoanAsync(string id, LoanUpdateRequest? request
         Builders<BsonDocument>.Update
             .Set("borrowerName", payload.BorrowerName)
             .Set("borrowerEmail", payload.BorrowerEmail)
-            .Set("notes", payload.Notes is null ? BsonNull.Value : payload.Notes)
+            .Set("notes", notesValue)
             .Set("dueAt", payload.DueAt)
             .Set("updatedAt", DateTime.UtcNow),
         new FindOneAndUpdateOptions<BsonDocument>
@@ -394,7 +400,8 @@ static async Task<IResult> UpdateLoanAsync(string id, LoanUpdateRequest? request
         return Results.Conflict(new ErrorResponse("A kölcsönzés időközben lezárult."));
     }
 
-    return Results.Ok(MapLoanResponse(updatedLoan));
+    var updatedLoanResponse = MapLoanResponse(updatedLoan);
+    return TypedResults.Ok(updatedLoanResponse);
 }
 
 static async Task<IResult> ReturnLoanAsync(string id, LoanReturnRequest? request, MongoDbContext db, CancellationToken cancellationToken)
@@ -406,7 +413,7 @@ static async Task<IResult> ReturnLoanAsync(string id, LoanReturnRequest? request
 
     var validationResult = ValidateLoanReturnPayload(request);
 
-    if (validationResult.Errors.Count > 0)
+    if (validationResult.Errors.Length > 0)
     {
         return Results.BadRequest(new ValidationErrorResponse("Érvénytelen visszahozási adatok.", validationResult.Errors));
     }
@@ -747,6 +754,19 @@ static Task<BsonDocument?> GetActiveLoanAsync(MongoDbContext db, ObjectId bookId
         .FirstOrDefaultAsync(cancellationToken);
 }
 
+static async Task<HashSet<string>> GetActiveLoanBookIdsAsync(MongoDbContext db, CancellationToken cancellationToken)
+{
+    var activeLoanBookIds = await db.Loans
+        .Find(Builders<BsonDocument>.Filter.Eq("status", "active"))
+        .Project(Builders<BsonDocument>.Projection.Include("bookId"))
+        .ToListAsync(cancellationToken);
+
+    return activeLoanBookIds
+        .Select(loan => GetFlexibleId(loan, "bookId"))
+        .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
+        .ToHashSet(StringComparer.Ordinal);
+}
+
 static async Task SetBookAvailabilityAsync(MongoDbContext db, ObjectId bookId, bool available, CancellationToken cancellationToken)
 {
     await db.Books.UpdateOneAsync(
@@ -796,7 +816,7 @@ static bool TryGetLoanBookId(BsonDocument loan, out ObjectId bookId)
         && ObjectId.TryParse(rawBookId.AsString, out bookId);
 }
 
-static BookResponse MapBookResponse(BsonDocument book)
+static BookResponse MapBookResponse(BsonDocument book, bool hasActiveLoan = false)
 {
     return new BookResponse(
         GetId(book),
@@ -804,7 +824,8 @@ static BookResponse MapBookResponse(BsonDocument book)
         GetString(book, "author"),
         GetInt32(book, "year"),
         GetString(book, "genre"),
-        GetBoolean(book, "available"));
+        GetBoolean(book, "available"),
+        hasActiveLoan);
 }
 
 static BookDetailResponse MapBookDetailResponse(BsonDocument book, BsonDocument? activeLoan)
@@ -965,7 +986,7 @@ sealed class MongoDbContext
             Builders<BsonDocument>.IndexKeys
                 .Ascending("bookId")
                 .Ascending("status"),
-            new CreateIndexOptions
+            new CreateIndexOptions<BsonDocument>
             {
                 Name = "unique_active_loan_per_book",
                 Unique = true,
@@ -976,7 +997,7 @@ sealed class MongoDbContext
             Builders<BsonDocument>.IndexKeys
                 .Ascending("status")
                 .Descending("loanedAt"),
-            new CreateIndexOptions
+            new CreateIndexOptions<BsonDocument>
             {
                 Name = "loans_by_status_and_date",
             });
@@ -1037,7 +1058,8 @@ sealed record BookResponse(
     string Author,
     int Year,
     string Genre,
-    bool Available);
+    bool Available,
+    bool HasActiveLoan = false);
 
 sealed record BookDetailResponse(
     [property: JsonPropertyName("_id")] string Id,

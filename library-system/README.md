@@ -1,65 +1,101 @@
 # Library System
 
-Ez a mappa a könyvtári rendszer MongoDB adatbázisát és az ahhoz kapcsolódó ASP.NET 10 / C# REST API-t tartalmazza.
+Ez a mappa most mar teljesebben leválasztott mikroszervizes felallasban tartalmazza a konyvtari rendszert:
 
-## Követelmények
+- `book-service`: a konyvek CRUD es listazo API-ja
+- `loan-service`: a kolcsonzesek kezelese
+- `api-gateway`: a frontend egyetlen belepesi pontja
+- `book-mongodb`: a konyvek sajat adatbazis-szolgaltatasa
+- `loan-mongodb`: a kolcsonzesek sajat adatbazis-szolgaltatasa
 
-Helyi futtatáshoz ezek kellenek:
+## Kovetelmenyek
+
+Helyi futtatashoz ezek kellenek:
 
 - Docker Desktop
 - Docker Compose
-- .NET 10 SDK
+- .NET 8 SDK
 
-## Indítás Dockerrel
+## Architektura
 
-Nyiss terminált a `library-system` mappában, majd futtasd:
+A frontend tovabbra is a `http://localhost:3000/api/...` vegpontokat hivja, de a hatter mar kulon adat-es szolgaltatas-hatarokkal fut:
+
+```text
+frontend -> api-gateway -> book-service -> book-mongodb
+frontend -> api-gateway -> loan-service -> loan-mongodb
+
+book-service <-> loan-service   # HTTP service-to-service kommunikacio
+loan-service <-> book-service   # book reserve / release folyamatokhoz
+```
+
+A fo valtozas, hogy:
+
+- a `book-service` mar nem olvas a kolcsonzes adatbazisabol
+- a `loan-service` mar nem olvas a konyvek adatbazisabol
+- a ket service egymas allapotat belso HTTP hivassal kerdezi le vagy modositja
+- mindket service sajat MongoDB szolgaltatast kapott
+
+## Inditas Dockerrel
+
+Nyiss terminalt a `library-system` mappaban, majd futtasd:
 
 ```bash
-docker compose up --build
+docker compose up -d --build --remove-orphans
 ```
 
 Ezzel elindul:
 
-- a MongoDB adatbázis a `27017` porton
-- az ASP.NET API a `3000` porton
+- a frontend Angular alkalmazas a `4200` porton
+- az API gateway a `3000` porton
+- a `book-service` a `3001` porton
+- a `loan-service` a `3002` porton
+- a `book-mongodb` a `27018` porton
+- a `loan-mongodb` a `27019` porton
 
-Az API címe:
+Hasznos cimek:
 
 ```text
-http://localhost:3000
+http://localhost:4200
+http://localhost:3000/health
+http://localhost:3001/health
+http://localhost:3002/health
 ```
 
-## Helyi fejlesztői futtatás
+## Helyi fejlesztoi futtatas
 
-Ha nem Dockerből szeretnéd indítani az API-t:
+Ha nem Dockerbol szeretned inditani a service-eket, kulon-kulon futtasd oket:
 
 ```bash
-cd backend
+cd book-service
 dotnet restore
 dotnet run
 ```
 
-Alapértelmezett környezeti változók:
-
-```text
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DB=library
-PORT=3000
+```bash
+cd loan-service
+dotnet restore
+dotnet run
 ```
 
-## Adatbázis
-
-Az adatbázis neve:
+Alapertelmezett kornyezeti valtozok:
 
 ```text
-library
+PORT=3001
+MONGODB_URI=mongodb://localhost:27018
+MONGODB_DB=books
+LOAN_SERVICE_URL=http://localhost:3002
 ```
 
-A seed adatok automatikusan betöltik a példa könyveket a MongoDB indulásakor.
+```text
+PORT=3002
+MONGODB_URI=mongodb://localhost:27019
+MONGODB_DB=loans
+BOOK_SERVICE_URL=http://localhost:3001
+```
 
 ## REST API
 
-Elérhető végpontok:
+A gateway mogott ugyanazok a publikus vegpontok maradtak:
 
 ```text
 GET    /api/books
@@ -76,54 +112,14 @@ PUT    /api/loans/:id
 PUT    /api/loans/:id/return
 ```
 
-Keresés és szűrés:
+A belso service-to-service vegpontok nem a gatewayen mennek at, hanem a Docker halozaton keresztul futnak.
 
-```text
-GET /api/books?search=tolkien
-GET /api/books?title=dune
-GET /api/books?author=orwell
-GET /api/books?genre=Fantasy
-GET /api/books?available=true
-```
+## Seed adatok
 
-## Minta payloadok
+A konyvek kezdoadatai a `database/book-seed` mappabol toltodnek be a `book-mongodb` szolgaltatasba.
 
-Könyv létrehozása vagy módosítása:
-
-```json
-{
-  "title": "Dune",
-  "author": "Frank Herbert",
-  "year": 1965,
-  "genre": "Science Fiction",
-  "available": true
-}
-```
-
-Kölcsönzés indítása:
-
-```json
-{
-  "bookId": "PUT_BOOK_ID_HERE",
-  "borrowerName": "Teszt Elek",
-  "borrowerEmail": "teszt.elek@example.com",
-  "dueAt": "2026-04-22",
-  "notes": "Első kölcsönzés"
-}
-```
-
-Kölcsönzés visszahozása:
-
-```json
-{
-  "returnedAt": "2026-04-15T14:30:00.000Z"
-}
-```
-
-## Konténeres háttér
-
-Az API a hivatalos Microsoft .NET 10 SDK és ASP.NET 10 futtatókörnyezet képeire épül, a MongoDB driver pedig a hivatalos `MongoDB.Driver` NuGet csomagot használja.
+A `loan-service` kulon ures adatbazissal indul, es a kolcsonzeseket mar csak a sajat `loan-mongodb` adatbazisaban tarolja.
 
 ## Kubernetes
 
-A MongoDB-hez tartozó meglévő Kubernetes manifestek a `k8s` mappában találhatók. Az API-hoz szükséges manifestek következő lépésként erre a C# backend képre építhetők rá.
+A `k8s` mappaban jelenleg a korabbi MongoDB manifestek vannak. Ha szeretned, a kovetkezo korben ezt is szetbontom kulon `book-service`, `loan-service`, `api-gateway`, `book-mongodb` es `loan-mongodb` deployment/service manifestekre.

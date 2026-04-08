@@ -1,19 +1,14 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0
 WORKDIR /src
 
 COPY ["LibrarySystem.Api.csproj", "./"]
 RUN dotnet restore "./LibrarySystem.Api.csproj"
 
 COPY . .
-RUN dotnet publish "./LibrarySystem.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
-WORKDIR /app
+RUN dotnet build "./LibrarySystem.Api.csproj" -c Release --no-restore
 
 ENV ASPNETCORE_URLS=http://+:3000
 
-COPY --from=build /app/publish .
-
 EXPOSE 3000
 
-ENTRYPOINT ["dotnet", "LibrarySystem.Api.dll"]
+ENTRYPOINT ["dotnet", "bin/Release/net8.0/LibrarySystem.Api.dll"]

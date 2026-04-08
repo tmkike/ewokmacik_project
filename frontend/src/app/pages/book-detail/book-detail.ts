@@ -28,6 +28,8 @@ export class BookDetail implements OnInit {
   bookId = '';
   activeLoan?: Loan;
   hasActiveLoanConflict = false;
+  private activeLoanRequestId = 0;
+  private activeLoanRequestBookId = '';
   loading = false;
   saving = false;
   loanLoading = false;
@@ -57,17 +59,29 @@ export class BookDetail implements OnInit {
       if (!id) {
         this.errorMessage = 'Hiányzó könyvazonosító.';
         this.loading = false;
-        this.loanLoading = false;
+        this.cancelActiveLoanLookup();
         return;
       }
 
       this.bookId = id;
+      this.primeLoanStateFromNavigationBook(id);
       this.loadBook(id);
     });
   }
 
   get canCreateLoan(): boolean {
     return Boolean(this.book?.available && !this.activeLoan);
+  }
+
+  get minimumLoanDueDate(): string {
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return this.toLocalDateValue(tomorrow);
+  }
+
+  get minimumLoanDueDateLabel(): string {
+    return this.formatDateLabel(this.minimumLoanDueDate);
   }
 
   get isLoanedState(): boolean {
@@ -80,6 +94,22 @@ export class BookDetail implements OnInit {
 
   get canDeleteBook(): boolean {
     return !this.activeLoan && !this.hasActiveLoanConflict && !this.loanLoading && !this.loanProcessing && !this.saving;
+  }
+
+  get bookStatusLabel(): string {
+    if (this.activeLoan || this.book?.hasActiveLoan || this.hasActiveLoanConflict) {
+      return 'Kikolcsonozve';
+    }
+
+    if (this.book?.available) {
+      return 'Elerheto';
+    }
+
+    return 'Nem elerheto';
+  }
+
+  get isAvailabilityToggleDisabled(): boolean {
+    return this.loanLoading || this.loanProcessing || this.saving || Boolean(this.activeLoan) || this.hasActiveLoanConflict;
   }
 
   get isLoanFormReadOnly(): boolean {
@@ -98,76 +128,82 @@ export class BookDetail implements OnInit {
     ).subscribe({
       next: (book) => {
         this.book = book;
-
-        if (book.activeLoan) {
-          this.applyLoadedActiveLoan(book.activeLoan);
-        }
-
         this.syncLoanState(book);
       },
       error: () => {
+        this.cancelActiveLoanLookup();
+        this.errorMessage = `Nem sikerült betölteni a könyvet. Azonosító: ${id}`;
+
+        if (this.book?._id === id) {
+          if (this.book.activeLoan) {
+            this.applyLoadedActiveLoan(this.book.activeLoan);
+            return;
+          }
+
+          if (this.book.available === false) {
+            this.activeLoan = undefined;
+            this.hasActiveLoanConflict = false;
+            this.loadActiveLoan(id);
+            return;
+          }
+        }
+
         this.activeLoan = undefined;
         this.hasActiveLoanConflict = false;
-        this.loanLoading = false;
-        this.errorMessage = `Nem sikerült betölteni a könyvet. Azonosító: ${id}`;
       },
     });
   }
 
   loadActiveLoan(bookId: string): void {
-    this.loanLoading = true;
-    this.loanErrorMessage = '';
+    if (this.loanLoading && this.activeLoanRequestBookId === bookId) {
+      return;
+    }
+
+    const requestId = this.beginActiveLoanLookup(bookId);
 
     this.loanService.getActiveLoanForBook(bookId).pipe(
       timeout(5000),
-      finalize(() => {
-        this.loanLoading = false;
-      }),
     ).subscribe({
       next: (loan) => {
-        if (loan) {
-          this.applyLoadedActiveLoan(loan);
+        if (!this.isCurrentActiveLoanLookup(bookId, requestId)) {
           return;
         }
 
-        this.loadActiveLoanFallback(bookId);
+        if (loan) {
+          this.applyLoadedActiveLoan(loan);
+          this.finishActiveLoanLookup(requestId);
+          return;
+        }
+
+        this.loadActiveLoanFallback(bookId, requestId);
       },
       error: () => {
-        this.activeLoan = undefined;
-        this.loanErrorMessage = 'Nem sikerült betölteni az aktív kölcsönzési adatokat.';
-
-        if (this.book?.available) {
-          this.loanForm = this.createEmptyLoanForm();
-        }
+        this.handleActiveLoanLookupError(bookId, requestId);
       },
     });
   }
 
-  private loadActiveLoanFallback(bookId: string): void {
+  private loadActiveLoanFallback(bookId: string, requestId: number): void {
     this.loanService.getActiveLoans().pipe(
       timeout(5000),
     ).subscribe({
       next: (loans) => {
+        if (!this.isCurrentActiveLoanLookup(bookId, requestId)) {
+          return;
+        }
+
         const fallbackLoan = loans.find((loan) => String(loan.bookId) === bookId);
 
         if (fallbackLoan) {
           this.applyLoadedActiveLoan(fallbackLoan);
+          this.finishActiveLoanLookup(requestId);
           return;
         }
 
-        this.activeLoan = undefined;
-
-        if (this.book?.available) {
-          this.loanForm = this.createEmptyLoanForm();
-        }
+        this.handleMissingActiveLoan(requestId);
       },
       error: () => {
-        this.activeLoan = undefined;
-        this.loanErrorMessage = 'Nem sikerült betölteni az aktív kölcsönzési adatokat.';
-
-        if (this.book?.available) {
-          this.loanForm = this.createEmptyLoanForm();
-        }
+        this.handleActiveLoanLookupError(bookId, requestId);
       },
     });
   }
@@ -202,7 +238,7 @@ export class BookDetail implements OnInit {
           this.loadActiveLoan(conflictedBookId);
         }
 
-        this.errorMessage = error.error?.message || 'Nem sikerült elmenteni a változásokat.';
+        this.errorMessage = this.extractErrorMessage(error, 'Nem sikerült elmenteni a változásokat.');
         this.successMessage = '';
       },
     });
@@ -210,6 +246,14 @@ export class BookDetail implements OnInit {
 
   saveLoan(): void {
     if (this.loanProcessing || this.saving || !this.book?._id || this.isLoanedState) {
+      return;
+    }
+
+    const validationMessage = this.validateLoanForm();
+
+    if (validationMessage) {
+      this.loanErrorMessage = validationMessage;
+      this.errorMessage = '';
       return;
     }
 
@@ -240,7 +284,8 @@ export class BookDetail implements OnInit {
       }),
     ).subscribe({
       next: (loan) => {
-        this.activeLoan = loan;
+        this.cancelActiveLoanLookup();
+        this.applyLoadedActiveLoan(loan);
 
         if (this.book) {
           this.book = {
@@ -249,11 +294,11 @@ export class BookDetail implements OnInit {
           };
         }
 
-        this.loanForm = this.createLoanFormFromLoan(loan);
         this.navigateToBooks('A kölcsönzés sikeresen elindult.');
       },
       error: (error: HttpErrorResponse) => {
-        this.errorMessage = error.error?.message || 'Nem sikerült elindítani a kölcsönzést.';
+        this.loanErrorMessage = this.extractErrorMessage(error, 'Nem sikerült elindítani a kölcsönzést.');
+        this.errorMessage = '';
         this.successMessage = '';
       },
     });
@@ -285,6 +330,7 @@ export class BookDetail implements OnInit {
       }),
     ).subscribe({
       next: () => {
+        this.cancelActiveLoanLookup();
         this.activeLoan = undefined;
         this.hasActiveLoanConflict = false;
 
@@ -292,6 +338,7 @@ export class BookDetail implements OnInit {
           this.book = {
             ...this.book,
             available: true,
+            hasActiveLoan: false,
           };
         }
 
@@ -299,7 +346,8 @@ export class BookDetail implements OnInit {
         this.navigateToBooks('A kölcsönzés sikeresen megszüntetve.');
       },
       error: (error: HttpErrorResponse) => {
-        this.errorMessage = error.error?.message || 'Nem sikerült megszüntetni a kölcsönzést.';
+        this.loanErrorMessage = this.extractErrorMessage(error, 'Nem sikerült megszüntetni a kölcsönzést.');
+        this.errorMessage = '';
         this.successMessage = '';
       },
     });
@@ -320,7 +368,7 @@ export class BookDetail implements OnInit {
         this.navigateToBooks('A könyv törlése sikeres.');
       },
       error: (error: HttpErrorResponse) => {
-        this.errorMessage = error.error?.message || 'Nem sikerült törölni a könyvet.';
+        this.errorMessage = this.extractErrorMessage(error, 'Nem sikerült törölni a könyvet.');
       },
     });
   }
@@ -337,7 +385,7 @@ export class BookDetail implements OnInit {
     if (!book._id) {
       this.activeLoan = undefined;
       this.hasActiveLoanConflict = false;
-      this.loanLoading = false;
+      this.cancelActiveLoanLookup();
       this.loanForm = this.createEmptyLoanForm();
       return;
     }
@@ -345,7 +393,7 @@ export class BookDetail implements OnInit {
     if (book.available) {
       this.activeLoan = undefined;
       this.hasActiveLoanConflict = false;
-      this.loanLoading = false;
+      this.cancelActiveLoanLookup();
       this.loanErrorMessage = '';
       this.loanForm = this.createEmptyLoanForm();
       return;
@@ -353,21 +401,25 @@ export class BookDetail implements OnInit {
 
     if (book.activeLoan) {
       this.applyLoadedActiveLoan(book.activeLoan);
-      this.loanLoading = false;
+      this.cancelActiveLoanLookup();
       return;
     }
 
     this.activeLoan = undefined;
     this.loanForm = this.createEmptyLoanForm();
+    this.hasActiveLoanConflict = Boolean(book.hasActiveLoan);
+    this.loadActiveLoan(book._id);
+  }
 
-    if (!book.hasActiveLoan) {
-      this.hasActiveLoanConflict = false;
-      this.loanLoading = false;
+  private primeLoanStateFromNavigationBook(id: string): void {
+    if (this.book?._id !== id || this.book.available) {
       return;
     }
 
-    this.hasActiveLoanConflict = true;
-    this.loadActiveLoan(book._id);
+    if (this.book.activeLoan) {
+      this.applyLoadedActiveLoan(this.book.activeLoan);
+      this.cancelActiveLoanLookup();
+    }
   }
 
   private navigateToBooks(systemMessage = ''): void {
@@ -398,16 +450,134 @@ export class BookDetail implements OnInit {
   private applyLoadedActiveLoan(loan: Loan): void {
     this.activeLoan = loan;
     this.hasActiveLoanConflict = false;
+
+    if (this.book) {
+      this.book = {
+        ...this.book,
+        available: false,
+        hasActiveLoan: true,
+      };
+    }
+
     this.loanForm = this.createLoanFormFromLoan(loan);
+  }
+
+  private beginActiveLoanLookup(bookId: string): number {
+    this.activeLoanRequestId += 1;
+    this.activeLoanRequestBookId = bookId;
+    this.loanLoading = true;
+    this.loanErrorMessage = '';
+    return this.activeLoanRequestId;
+  }
+
+  private finishActiveLoanLookup(requestId: number): void {
+    if (this.activeLoanRequestId !== requestId) {
+      return;
+    }
+
+    this.activeLoanRequestBookId = '';
+    this.loanLoading = false;
+  }
+
+  private cancelActiveLoanLookup(): void {
+    this.activeLoanRequestId += 1;
+    this.activeLoanRequestBookId = '';
+    this.loanLoading = false;
+  }
+
+  private isCurrentActiveLoanLookup(bookId: string, requestId: number): boolean {
+    return this.activeLoanRequestId === requestId && this.activeLoanRequestBookId === bookId;
+  }
+
+  private handleMissingActiveLoan(requestId: number): void {
+    this.activeLoan = undefined;
+
+    if (this.book) {
+      this.book = {
+        ...this.book,
+        hasActiveLoan: false,
+      };
+    }
+
+    if (this.book?.available) {
+      this.loanForm = this.createEmptyLoanForm();
+    }
+
+    this.finishActiveLoanLookup(requestId);
+  }
+
+  private handleActiveLoanLookupError(bookId: string, requestId: number): void {
+    if (!this.isCurrentActiveLoanLookup(bookId, requestId)) {
+      return;
+    }
+
+    this.activeLoan = undefined;
+    this.loanErrorMessage = 'Nem sikerült betölteni az aktív kölcsönzési adatokat.';
+
+    if (this.book?.available) {
+      this.loanForm = this.createEmptyLoanForm();
+    }
+
+    this.finishActiveLoanLookup(requestId);
   }
 
   private toIsoDate(value: string): string {
     return value;
   }
 
+  private validateLoanForm(): string | null {
+    const borrowerName = this.loanForm.borrowerName.trim();
+    const borrowerEmail = this.loanForm.borrowerEmail.trim();
+    const dueAt = this.loanForm.dueAt;
+
+    if (!borrowerName) {
+      return 'Add meg a kölcsönző nevét.';
+    }
+
+    if (!borrowerEmail) {
+      return 'Add meg a kölcsönző e-mail címét.';
+    }
+
+    if (!this.isValidEmail(borrowerEmail)) {
+      return 'Adj meg érvényes e-mail címet.';
+    }
+
+    if (!dueAt) {
+      return 'Add meg a kölcsönzés határidejét.';
+    }
+
+    if (dueAt < this.minimumLoanDueDate) {
+      return `A határidő legkorábban ${this.minimumLoanDueDateLabel} lehet.`;
+    }
+
+    return null;
+  }
+
   private isActiveLoanConflict(error: HttpErrorResponse): boolean {
-    const message = String(error.error?.message || '').toLowerCase();
-    return message.includes('aktív kölcsönzés');
+    const sourceText = [
+      error.error?.message,
+      ...(Array.isArray(error.error?.errors) ? error.error.errors : []),
+    ].join(' ');
+    const normalizedSourceText = this.normalizeSearchText(sourceText);
+
+    return normalizedSourceText.includes('aktiv kolcsonz')
+      || (normalizedSourceText.includes('kolcsonz') && normalizedSourceText.includes('elerheto'))
+      || (normalizedSourceText.includes('jelolhet') && normalizedSourceText.includes('elerheto'));
+  }
+
+  private extractErrorMessage(error: HttpErrorResponse, fallbackMessage: string): string {
+    const message = error.error?.message;
+    const firstValidationError = Array.isArray(error.error?.errors) ? error.error.errors[0] : undefined;
+
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+
+    if (typeof firstValidationError === 'string' && firstValidationError.trim()) {
+      return firstValidationError;
+    }
+
+    return fallbackMessage;
   }
 
   private toDateValue(value: string | null): string {
@@ -415,6 +585,47 @@ export class BookDetail implements OnInit {
       return '';
     }
 
-    return new Date(value).toISOString().slice(0, 10);
+    return this.toLocalDateValue(new Date(value));
+  }
+
+  private isValidEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+
+  private formatDateLabel(value: string): string {
+    const [year, month, day] = value.split('-');
+    return `${year}.${month}.${day}.`;
+  }
+
+  formatLoanDateLabel(value: string | null | undefined): string {
+    if (!value) {
+      return 'Nincs megadva';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return 'Nincs megadva';
+    }
+
+    return new Intl.DateTimeFormat('hu-HU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  }
+
+  private toLocalDateValue(value: Date): string {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   }
 }

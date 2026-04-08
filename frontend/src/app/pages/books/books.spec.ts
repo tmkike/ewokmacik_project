@@ -51,4 +51,28 @@ describe('Books', () => {
 
     expect(replaceStateSpy).toHaveBeenCalled();
   });
+
+  it('should label books with an active loan as borrowed', () => {
+    expect(component.getBookAvailabilityLabel({
+      _id: '1',
+      title: 'Dune',
+      author: 'Frank Herbert',
+      year: 1965,
+      genre: 'Science Fiction',
+      available: false,
+      hasActiveLoan: true,
+    })).toBe('Kikolcsonozve');
+  });
+
+  it('should keep regular unavailable books distinct from borrowed ones', () => {
+    expect(component.getBookAvailabilityLabel({
+      _id: '1',
+      title: 'Dune',
+      author: 'Frank Herbert',
+      year: 1965,
+      genre: 'Science Fiction',
+      available: false,
+      hasActiveLoan: false,
+    })).toBe('Nem elerheto');
+  });
 });

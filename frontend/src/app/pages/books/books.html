@@ -80,7 +80,7 @@
         <button type="button" class="book-list-item" (click)="openBook(book)">
           <span class="book-title">{{ book.title }}</span>
           <span class="book-meta">{{ book.author }} - {{ book.year }} - {{ book.genre }}</span>
-          <span class="availability">{{ book.available ? 'Elérhető' : 'Nem elérhető' }}</span>
+          <span [class]="getBookAvailabilityClass(book)">{{ getBookAvailabilityLabel(book) }}</span>
         </button>
       </li>
     </ul>
