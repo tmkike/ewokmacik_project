@@ -1,75 +1,65 @@
-# Library System Database
+# Library System
 
-This repository contains the MongoDB database setup for the Library System project.
+Ez a mappa a könyvtári rendszer MongoDB adatbázisát és az ahhoz kapcsolódó ASP.NET 10 / C# REST API-t tartalmazza.
 
-The database runs in a Docker container and automatically loads example book data.
+## Követelmények
 
-## Requirements
+Helyi futtatáshoz ezek kellenek:
 
-Before running the database you need:
-
-- Docker Desktop installed
+- Docker Desktop
 - Docker Compose
+- .NET 10 SDK
 
-## Start the database
+## Indítás Dockerrel
 
-Open a terminal in the `library-system` folder and run:
-
-```bash
-docker compose up -d
-```
-
-This will start the MongoDB container.
-
-## Stop the database
-
-```bash
-docker compose down
-```
-
-## Database information
-
-Database name:
-
-```
-library
-```
-
-Collection:
-
-```
-books
-```
-
-The database automatically loads **20 example books** when the container starts.
-
-## MongoDB connection
-
-MongoDB runs on:
-
-```
-localhost:27017
-```
-
-This can be used by the backend service.
-
-## REST API
-
-The project also contains a Node.js/Express backend in the `backend` folder.
-
-Run the API and MongoDB together:
+Nyiss terminált a `library-system` mappában, majd futtasd:
 
 ```bash
 docker compose up --build
 ```
 
-The API runs on:
+Ezzel elindul:
+
+- a MongoDB adatbázis a `27017` porton
+- az ASP.NET API a `3000` porton
+
+Az API címe:
 
 ```text
 http://localhost:3000
 ```
 
-Available endpoints:
+## Helyi fejlesztői futtatás
+
+Ha nem Dockerből szeretnéd indítani az API-t:
+
+```bash
+cd backend
+dotnet restore
+dotnet run
+```
+
+Alapértelmezett környezeti változók:
+
+```text
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB=library
+PORT=3000
+```
+
+## Adatbázis
+
+Az adatbázis neve:
+
+```text
+library
+```
+
+A seed adatok automatikusan betöltik a példa könyveket a MongoDB indulásakor.
+
+## REST API
+
+Elérhető végpontok:
 
 ```text
 GET    /api/books
@@ -78,18 +68,27 @@ POST   /api/books
 PUT    /api/books/:id
 PATCH  /api/books/:id/availability
 DELETE /api/books/:id
+
+GET    /api/loans
+GET    /api/loans/active
+POST   /api/loans
+PUT    /api/loans/:id
+PUT    /api/loans/:id/return
 ```
 
-Search and filter examples:
+Keresés és szűrés:
 
 ```text
 GET /api/books?search=tolkien
+GET /api/books?title=dune
+GET /api/books?author=orwell
 GET /api/books?genre=Fantasy
 GET /api/books?available=true
-GET /api/books?author=orwell
 ```
 
-Example book payload:
+## Minta payloadok
+
+Könyv létrehozása vagy módosítása:
 
 ```json
 {
@@ -101,41 +100,30 @@ Example book payload:
 }
 ```
 
-## Project structure
+Kölcsönzés indítása:
 
-```
-library-system
-│
-├ docker-compose.yml
-│
-└ database
-  └ seed
-     ├ books.json
-     └ init.sh
-`
-
-``## Kubernetes deployment
-
-Create namespace:
-
-```bash
-kubectl apply -f k8s/namespace.yaml
+```json
+{
+  "bookId": "PUT_BOOK_ID_HERE",
+  "borrowerName": "Teszt Elek",
+  "borrowerEmail": "teszt.elek@example.com",
+  "dueAt": "2026-04-22",
+  "notes": "Első kölcsönzés"
+}
 ```
 
-Deploy MongoDB:
+Kölcsönzés visszahozása:
 
-```bash
-kubectl apply -f k8s/mongodb-deployment.yaml
+```json
+{
+  "returnedAt": "2026-04-15T14:30:00.000Z"
+}
 ```
 
-Create service:
+## Konténeres háttér
 
-```bash
-kubectl apply -f k8s/mongodb-service.yaml
-```
+Az API a hivatalos Microsoft .NET 10 SDK és ASP.NET 10 futtatókörnyezet képeire épül, a MongoDB driver pedig a hivatalos `MongoDB.Driver` NuGet csomagot használja.
 
-Check pods:
+## Kubernetes
 
-```bash
-kubectl get pods
-```
+A MongoDB-hez tartozó meglévő Kubernetes manifestek a `k8s` mappában találhatók. Az API-hoz szükséges manifestek következő lépésként erre a C# backend képre építhetők rá.

@@ -3,7 +3,7 @@
     <button
       type="button"
       class="back-link"
-      [disabled]="saving"
+      [disabled]="saving || loanProcessing"
       (click)="goBackToBooks()"
     >
       Vissza a könyvekhez
@@ -11,16 +11,31 @@
 
     <p class="status" *ngIf="loading">Könyv betöltése...</p>
     <p class="status" *ngIf="saving">Mentés folyamatban...</p>
+    <p class="status" *ngIf="loanProcessing">Kölcsönzési művelet folyamatban...</p>
     <p class="status" *ngIf="bookId && !book && !loading && !errorMessage">
       Nincs betöltött könyv ehhez az azonosítóhoz: {{ bookId }}
     </p>
-    <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-    <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+    <div
+      *ngIf="successMessage"
+      class="system-message system-message--success"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>Sikeres művelet:</strong> {{ successMessage }}
+    </div>
+    <div
+      *ngIf="errorMessage"
+      class="system-message system-message--error"
+      role="alert"
+      aria-live="assertive"
+    >
+      <strong>Sikertelen művelet:</strong> {{ errorMessage }}
+    </div>
 
     <form *ngIf="book" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
       <h1>{{ book.title }}</h1>
 
-      <fieldset class="edit-fieldset" [disabled]="saving">
+      <fieldset class="edit-fieldset" [disabled]="saving || loanProcessing">
         <label>
           <span class="label-text">Cím <span class="required-marker">*</span></span>
           <input type="text" name="title" required [(ngModel)]="book.title" />
@@ -47,12 +62,101 @@
         </label>
 
         <div class="form-actions">
-          <button type="submit" [disabled]="editForm.invalid || saving">
+          <button type="submit" [disabled]="editForm.invalid || saving || loanProcessing">
             {{ saving ? 'Mentés...' : 'Mentés' }}
           </button>
-          <button type="button" class="danger" [disabled]="saving" (click)="deleteBook()">Törlés</button>
+          <button type="button" class="danger" [disabled]="!canDeleteBook" (click)="deleteBook()">
+            Törlés
+          </button>
         </div>
       </fieldset>
     </form>
+
+    <p class="status" *ngIf="activeLoan">
+      Kikölcsönzött könyv nem törölhető.
+    </p>
+
+    <section class="loan-panel" *ngIf="book">
+      <h2>Kölcsönzéskezelés</h2>
+
+      <div class="loan-termination-action" *ngIf="showLoanTerminationButton">
+        <button
+          type="button"
+          class="danger"
+          [disabled]="loanLoading || !activeLoan || loanProcessing || saving"
+          (click)="returnLoan()"
+        >
+          Kölcsönzés megszüntetése
+        </button>
+      </div>
+
+      <p class="status" *ngIf="loanLoading && !activeLoan">Aktív kölcsönzés betöltése...</p>
+      <p class="error" *ngIf="loanErrorMessage">{{ loanErrorMessage }}</p>
+      <p class="status" *ngIf="activeLoan">
+        A könyv jelenleg ki van kölcsönözve. A kölcsönzési adatok csak olvashatók.
+      </p>
+
+      <form
+        class="loan-form"
+        (ngSubmit)="saveLoan()"
+        #loanFormRef="ngForm"
+      >
+        <label>
+          <span class="label-text">Kölcsönző neve <span class="required-marker">*</span></span>
+          <input
+            type="text"
+            name="borrowerName"
+            required
+            [(ngModel)]="loanForm.borrowerName"
+            [disabled]="isLoanFormReadOnly"
+          />
+        </label>
+
+        <label>
+          <span class="label-text">Kölcsönző e-mail címe <span class="required-marker">*</span></span>
+          <input
+            type="email"
+            name="borrowerEmail"
+            required
+            [(ngModel)]="loanForm.borrowerEmail"
+            [disabled]="isLoanFormReadOnly"
+          />
+        </label>
+
+        <label>
+          <span class="label-text">Határidő <span class="required-marker">*</span></span>
+          <input
+            type="date"
+            name="dueAt"
+            required
+            [(ngModel)]="loanForm.dueAt"
+            [disabled]="isLoanFormReadOnly"
+          />
+        </label>
+
+        <label>
+          <span class="label-text">Megjegyzés</span>
+          <textarea
+            name="notes"
+            rows="3"
+            [(ngModel)]="loanForm.notes"
+            [disabled]="isLoanFormReadOnly"
+          ></textarea>
+        </label>
+
+        <div class="form-actions" *ngIf="canCreateLoan">
+          <button
+            type="submit"
+            [disabled]="loanFormRef.invalid || loanLoading || loanProcessing || saving || !canCreateLoan"
+          >
+            Kölcsönzés indítása
+          </button>
+        </div>
+      </form>
+
+      <p class="status" *ngIf="!loanLoading && !activeLoan && !book.available">
+        A könyv jelenleg nem elérhető.
+      </p>
+    </section>
   </div>
 </section>

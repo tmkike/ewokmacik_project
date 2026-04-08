@@ -1,12 +1,19 @@
-FROM node:24-alpine
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
 
+COPY ["LibrarySystem.Api.csproj", "./"]
+RUN dotnet restore "./LibrarySystem.Api.csproj"
+
+COPY . .
+RUN dotnet publish "./LibrarySystem.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --omit=dev
+ENV ASPNETCORE_URLS=http://+:3000
 
-COPY src ./src
+COPY --from=build /app/publish .
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+ENTRYPOINT ["dotnet", "LibrarySystem.Api.dll"]

@@ -1,3 +1,5 @@
+import { Loan } from './loan';
+
 export interface Book {
   _id?: string;
   title: string;
@@ -5,6 +7,8 @@ export interface Book {
   year: number;
   genre: string;
   available: boolean;
+  hasActiveLoan?: boolean;
+  activeLoan?: Loan | null;
 }
 
 export interface BookFilters {

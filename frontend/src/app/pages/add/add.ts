@@ -30,7 +30,7 @@ export class Add {
       next: () => {
         this.saving = false;
         // Sikeres mentés után a felhasználó rögtön a friss listára kerül vissza.
-        this.navigateToBooks();
+        this.navigateToBooks('A könyv hozzáadása sikeres.');
       },
       error: () => {
         this.errorMessage = 'Nem sikerült hozzáadni a könyvet.';
@@ -39,9 +39,10 @@ export class Add {
     });
   }
 
-  private navigateToBooks(): void {
+  private navigateToBooks(systemMessage = ''): void {
     void this.router.navigate(['/books'], {
       queryParams: { refresh: Date.now() },
+      state: systemMessage ? { systemMessage } : undefined,
     });
   }
 

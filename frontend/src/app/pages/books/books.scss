@@ -74,6 +74,18 @@ button {
   padding: 0;
 }
 
+.system-message {
+  border: 1px solid #9fd3b3;
+  border-radius: 10px;
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.system-message--success {
+  background: #e8f6ee;
+  color: #157347;
+}
+
 .book-list-item {
   background: #f8f3ec;
   border: 1px solid #c8c2b8;

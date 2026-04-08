@@ -64,6 +64,15 @@
       </div>
     </div>
 
+    <div
+      *ngIf="successMessage && successMessageVisible"
+      class="system-message system-message--success"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>Sikeres művelet:</strong> {{ successMessage }}
+    </div>
+
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
     <ul class="book-list" *ngIf="books.length > 0" aria-label="Könyvek">

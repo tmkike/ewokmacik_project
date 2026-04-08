@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize, skip, Subscription } from 'rxjs';
@@ -16,20 +16,25 @@ import { BookService } from '../../services/book.service';
 export class Books implements OnInit, OnDestroy {
   private booksSubscription?: Subscription;
   private refreshSubscription?: Subscription;
+  private successMessageTimeoutId?: ReturnType<typeof setTimeout>;
 
   allBooks: Book[] = [];
   books: Book[] = [];
   loading = false;
   errorMessage = '';
+  successMessage = '';
+  successMessageVisible = false;
   filters: BookFilters = this.createEmptyFilters();
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly bookService: BookService,
     private readonly router: Router,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
+    this.readNavigationMessage();
     this.refreshBooks(true);
 
     this.refreshSubscription = this.route.queryParamMap.pipe(
@@ -42,6 +47,7 @@ export class Books implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.booksSubscription?.unsubscribe();
     this.refreshSubscription?.unsubscribe();
+    this.clearSuccessMessageTimeout();
   }
 
   loadBooks(): void {
@@ -95,6 +101,45 @@ export class Books implements OnInit, OnDestroy {
     }
 
     this.loadBooks();
+  }
+
+  private readNavigationMessage(): void {
+    const navigationMessage = this.router.getCurrentNavigation()?.extras.state?.['systemMessage']
+      ?? history.state?.systemMessage;
+
+    this.successMessage = typeof navigationMessage === 'string' ? navigationMessage : '';
+
+    if (this.successMessage) {
+      this.successMessageVisible = true;
+      this.clearNavigationMessageFromHistory();
+      this.startSuccessMessageTimer();
+    }
+  }
+
+  private startSuccessMessageTimer(): void {
+    this.clearSuccessMessageTimeout();
+    this.successMessageTimeoutId = setTimeout(() => {
+      this.successMessageVisible = false;
+      this.successMessage = '';
+      this.successMessageTimeoutId = undefined;
+      this.changeDetectorRef.detectChanges();
+    }, 1500);
+  }
+
+  private clearSuccessMessageTimeout(): void {
+    if (this.successMessageTimeoutId) {
+      clearTimeout(this.successMessageTimeoutId);
+      this.successMessageTimeoutId = undefined;
+    }
+  }
+
+  private clearNavigationMessageFromHistory(): void {
+    const nextState = {
+      ...history.state,
+      systemMessage: undefined,
+    };
+
+    history.replaceState(nextState, document.title, window.location.href);
   }
 
   private applyClientSideFilters(books: Book[]): Book[] {
