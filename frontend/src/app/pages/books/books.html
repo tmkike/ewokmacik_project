@@ -9,39 +9,64 @@
       <a class="add-button" routerLink="/add">Új könyv hozzáadása</a>
     </div>
 
-    <form class="filters" (ngSubmit)="applyFilters()">
+    <div class="filters">
       <label>
         Cím
-        <input type="text" name="title" placeholder="Cím" [(ngModel)]="filters.title" />
+        <input
+          type="text"
+          name="title"
+          placeholder="Cím"
+          [(ngModel)]="filters.title"
+          (ngModelChange)="applyFilters()"
+        />
       </label>
 
       <label>
         Szerző
-        <input type="text" name="author" placeholder="Szerző" [(ngModel)]="filters.author" />
+        <input
+          type="text"
+          name="author"
+          placeholder="Szerző"
+          [(ngModel)]="filters.author"
+          (ngModelChange)="applyFilters()"
+        />
       </label>
 
       <label>
         Kategória
-        <input type="text" name="genre" placeholder="Kategória" [(ngModel)]="filters.genre" />
+        <input
+          type="text"
+          name="genre"
+          placeholder="Kategória"
+          [(ngModel)]="filters.genre"
+          (ngModelChange)="applyFilters()"
+        />
       </label>
 
       <label>
         Elérhetőség
-        <select name="available" [(ngModel)]="filters.available">
+        <select
+          name="available"
+          [(ngModel)]="filters.available"
+          (ngModelChange)="applyFilters()"
+        >
           <option [ngValue]="''">Mind</option>
           <option [ngValue]="true">Elérhető</option>
           <option [ngValue]="false">Nem elérhető</option>
         </select>
       </label>
 
-      <button type="submit">Keresés</button>
-      <button type="button" (click)="clearFilters()">Szűrők törlése</button>
-    </form>
+      <div class="filter-actions">
+        <button type="button" class="filter-button" (click)="applyFilters()">Keresés</button>
+        <button type="button" class="filter-button secondary" (click)="clearFilters()">
+          Szűrők törlése
+        </button>
+      </div>
+    </div>
 
-    <p class="status" *ngIf="loading">Könyvek betöltése...</p>
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
-    <ul class="book-list" *ngIf="!loading && books.length > 0" aria-label="Könyvek">
+    <ul class="book-list" *ngIf="books.length > 0" aria-label="Könyvek">
       <li *ngFor="let book of books">
         <button type="button" class="book-list-item" (click)="openBook(book)">
           <span class="book-title">{{ book.title }}</span>

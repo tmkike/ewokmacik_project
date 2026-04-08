@@ -1,39 +1,38 @@
 <section class="book-form-page">
   <div class="book-form-card">
-    <h1>Uj konyv hozzaadasa</h1>
+    <h1>Új könyv hozzáadása</h1>
 
     <form (ngSubmit)="addBook()" #bookForm="ngForm">
       <label>
-        Cim
+        <span class="label-text">Cím <span class="required-marker">*</span></span>
         <input type="text" name="title" required [(ngModel)]="book.title" />
       </label>
 
       <label>
-        Szerzo
+        <span class="label-text">Szerző <span class="required-marker">*</span></span>
         <input type="text" name="author" required [(ngModel)]="book.author" />
       </label>
 
       <label>
-        Kiadas eve
+        <span class="label-text">Kiadás éve <span class="required-marker">*</span></span>
         <input type="number" name="year" required min="0" [(ngModel)]="book.year" />
       </label>
 
       <label>
-        Kategoria
+        <span class="label-text">Kategória <span class="required-marker">*</span></span>
         <input type="text" name="genre" required [(ngModel)]="book.genre" />
       </label>
 
       <label class="checkbox-row">
         <input type="checkbox" name="available" [(ngModel)]="book.available" />
-        Elerheto
+        Elérhető
       </label>
 
       <button type="submit" [disabled]="bookForm.invalid || saving">
-        {{ saving ? 'Mentes...' : 'Konyv hozzaadasa' }}
+        {{ saving ? 'Mentés...' : 'Könyv hozzáadása' }}
       </button>
     </form>
 
-    <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
   </div>
 </section>

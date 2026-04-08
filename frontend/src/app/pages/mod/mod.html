@@ -1,18 +1,18 @@
 <section class="mod-page">
   <div class="mod-card">
-    <h1>Konyvek modositasa es torlese</h1>
+    <h1>Könyvek módosítása és törlése</h1>
 
-    <p class="status" *ngIf="loading">Konyvek betoltese...</p>
+    <p class="status" *ngIf="loading">Könyvek betöltése...</p>
     <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
     <table *ngIf="!loading && books.length > 0">
       <thead>
         <tr>
-          <th>Cim</th>
-          <th>Szerzo</th>
-          <th>Elerheto</th>
-          <th>Muveletek</th>
+          <th>Cím</th>
+          <th>Szerző</th>
+          <th>Elérhető</th>
+          <th>Műveletek</th>
         </tr>
       </thead>
       <tbody>
@@ -21,48 +21,48 @@
           <td>{{ book.author }}</td>
           <td>{{ book.available ? 'Igen' : 'Nem' }}</td>
           <td class="actions">
-            <button type="button" (click)="selectBook(book)">Szerkesztes</button>
+            <button type="button" (click)="selectBook(book)">Szerkesztés</button>
             <button type="button" (click)="toggleAvailability(book)">
-              {{ book.available ? 'Nem elerheto' : 'Elerheto' }}
+              {{ book.available ? 'Nem elérhető' : 'Elérhető' }}
             </button>
-            <button type="button" class="danger" (click)="deleteBook(book)">Torles</button>
+            <button type="button" class="danger" (click)="deleteBook(book)">Törlés</button>
           </td>
         </tr>
       </tbody>
     </table>
 
-    <p class="status" *ngIf="!loading && books.length === 0">Nincs modositando konyv.</p>
+    <p class="status" *ngIf="!loading && books.length === 0">Nincs módosítandó könyv.</p>
 
     <form *ngIf="selectedBook" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
-      <h2>Kivalasztott konyv szerkesztese</h2>
+      <h2>Kiválasztott könyv szerkesztése</h2>
 
       <label>
-        Cim
+        Cím
         <input type="text" name="title" required [(ngModel)]="selectedBook.title" />
       </label>
 
       <label>
-        Szerzo
+        Szerző
         <input type="text" name="author" required [(ngModel)]="selectedBook.author" />
       </label>
 
       <label>
-        Kiadas eve
+        Kiadás éve
         <input type="number" name="year" required min="0" [(ngModel)]="selectedBook.year" />
       </label>
 
       <label>
-        Kategoria
+        Kategória
         <input type="text" name="genre" required [(ngModel)]="selectedBook.genre" />
       </label>
 
       <label class="checkbox-row">
         <input type="checkbox" name="available" [(ngModel)]="selectedBook.available" />
-        Elerheto
+        Elérhető
       </label>
 
       <button type="submit" [disabled]="editForm.invalid || saving">
-        {{ saving ? 'Mentes...' : 'Mentes' }}
+        {{ saving ? 'Mentés...' : 'Mentés' }}
       </button>
     </form>
   </div>

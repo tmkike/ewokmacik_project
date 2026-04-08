@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 import { Book } from '../../models/book';
 import { BookService } from '../../services/book.service';
@@ -14,26 +15,33 @@ import { BookService } from '../../services/book.service';
 export class Add {
   book: Book = this.createEmptyBook();
   saving = false;
-  successMessage = '';
   errorMessage = '';
 
-  constructor(private readonly bookService: BookService) {}
+  constructor(
+    private readonly bookService: BookService,
+    private readonly router: Router,
+  ) {}
 
   addBook(): void {
     this.saving = true;
-    this.successMessage = '';
     this.errorMessage = '';
 
     this.bookService.addBook(this.book).subscribe({
       next: () => {
-        this.successMessage = 'A konyv sikeresen hozzaadva.';
-        this.book = this.createEmptyBook();
         this.saving = false;
+        // Sikeres mentés után a felhasználó rögtön a friss listára kerül vissza.
+        this.navigateToBooks();
       },
       error: () => {
-        this.errorMessage = 'Nem sikerult hozzaadni a konyvet.';
+        this.errorMessage = 'Nem sikerült hozzáadni a könyvet.';
         this.saving = false;
       },
+    });
+  }
+
+  private navigateToBooks(): void {
+    void this.router.navigate(['/books'], {
+      queryParams: { refresh: Date.now() },
     });
   }
 

@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { finalize, skip, Subscription } from 'rxjs';
 
 import { Book, BookFilters } from '../../models/book';
 import { BookService } from '../../services/book.service';
@@ -12,40 +13,56 @@ import { BookService } from '../../services/book.service';
   templateUrl: './books.html',
   styleUrl: './books.scss',
 })
-export class Books {
+export class Books implements OnInit, OnDestroy {
+  private booksSubscription?: Subscription;
+  private refreshSubscription?: Subscription;
+
   allBooks: Book[] = [];
   books: Book[] = [];
   loading = false;
   errorMessage = '';
-  filters: BookFilters = {
-    title: '',
-    genre: '',
-    author: '',
-    available: '',
-  };
+  filters: BookFilters = this.createEmptyFilters();
 
   constructor(
+    private readonly route: ActivatedRoute,
     private readonly bookService: BookService,
     private readonly router: Router,
   ) {}
 
   ngOnInit(): void {
-    this.loadBooks();
+    this.refreshBooks(true);
+
+    this.refreshSubscription = this.route.queryParamMap.pipe(
+      skip(1),
+    ).subscribe(() => {
+      this.refreshBooks(true);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.booksSubscription?.unsubscribe();
+    this.refreshSubscription?.unsubscribe();
   }
 
   loadBooks(): void {
+    this.booksSubscription?.unsubscribe();
     this.loading = true;
     this.errorMessage = '';
 
-    this.bookService.getBooks().subscribe({
+    // A lista egyszer töltődik be a backenből, utána a mezők kliensoldalon szűrnek.
+    this.booksSubscription = this.bookService.getBooks().pipe(
+      finalize(() => {
+        this.loading = false;
+      }),
+    ).subscribe({
       next: (books) => {
         this.allBooks = books;
         this.applyFilters();
-        this.loading = false;
       },
       error: () => {
-        this.errorMessage = 'Nem sikerult betolteni a konyveket.';
-        this.loading = false;
+        this.errorMessage = 'Nem sikerült betölteni a könyveket.';
+        this.allBooks = [];
+        this.books = [];
       },
     });
   }
@@ -55,24 +72,29 @@ export class Books {
   }
 
   clearFilters(): void {
-    this.filters = {
-      title: '',
-      genre: '',
-      author: '',
-      available: '',
-    };
+    this.filters = this.createEmptyFilters();
     this.applyFilters();
+    this.loadBooks();
   }
 
   openBook(book: Book): void {
     if (!book._id) {
-      this.errorMessage = 'A konyvnek nincs azonositoja, ezert nem nyithato meg.';
+      this.errorMessage = 'A könyvnek nincs azonosítója, ezért nem nyitható meg.';
       return;
     }
 
     void this.router.navigate(['/books', book._id], {
       state: { book },
     });
+  }
+
+  private refreshBooks(resetFilters: boolean): void {
+    if (resetFilters) {
+      // Visszanavigáláskor mindig teljes listával, alap szűrőkkel indulunk.
+      this.filters = this.createEmptyFilters();
+    }
+
+    this.loadBooks();
   }
 
   private applyClientSideFilters(books: Book[]): Book[] {
@@ -93,5 +115,14 @@ export class Books {
     }
 
     return value.toLowerCase().includes(filter.trim().toLowerCase());
+  }
+
+  private createEmptyFilters(): BookFilters {
+    return {
+      title: '',
+      author: '',
+      genre: '',
+      available: '',
+    };
   }
 }

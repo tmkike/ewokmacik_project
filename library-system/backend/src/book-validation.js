@@ -1,3 +1,7 @@
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function normalizeBookPayload(payload) {
   return {
     title: typeof payload.title === 'string' ? payload.title.trim() : payload.title,
@@ -10,35 +14,44 @@ function normalizeBookPayload(payload) {
 
 function validateBookPayload(payload, { partial = false } = {}) {
   const errors = [];
+
+  if (!isPlainObject(payload)) {
+    return {
+      book: normalizeBookPayload({}),
+      errors: ['A kérés törzsének JSON objektumnak kell lennie.'],
+    };
+  }
+
   const book = normalizeBookPayload(payload);
 
+  // Csak azokat a mezőket kérjük számon, amelyeket a kérésnek valóban tartalmaznia kell.
   if (!partial || Object.prototype.hasOwnProperty.call(payload, 'title')) {
     if (!book.title || typeof book.title !== 'string') {
-      errors.push('title is required and must be a non-empty string');
+      errors.push('A cím kötelező, és nem lehet üres.');
     }
   }
 
   if (!partial || Object.prototype.hasOwnProperty.call(payload, 'author')) {
     if (!book.author || typeof book.author !== 'string') {
-      errors.push('author is required and must be a non-empty string');
+      errors.push('A szerző megadása kötelező, és nem lehet üres.');
     }
   }
 
   if (!partial || Object.prototype.hasOwnProperty.call(payload, 'year')) {
     if (!Number.isInteger(book.year) || book.year < 0) {
-      errors.push('year is required and must be a positive integer');
+      errors.push('A kiadás éve kötelező, és nemnegatív egész számnak kell lennie.');
     }
   }
 
   if (!partial || Object.prototype.hasOwnProperty.call(payload, 'genre')) {
     if (!book.genre || typeof book.genre !== 'string') {
-      errors.push('genre is required and must be a non-empty string');
+      errors.push('A kategória megadása kötelező, és nem lehet üres.');
     }
   }
 
   if (!partial || Object.prototype.hasOwnProperty.call(payload, 'available')) {
     if (typeof book.available !== 'boolean') {
-      errors.push('available is required and must be a boolean');
+      errors.push('Az elérhetőség megadása kötelező, és logikai értéknek kell lennie.');
     }
   }
 

@@ -1,11 +1,12 @@
 import { Routes } from '@angular/router';
+
 import { MainLayout } from './layout/main-layout/main-layout';
-import { Home } from './pages/home/home';
-import { Books } from './pages/books/books';
-import { BookDetail } from './pages/book-detail/book-detail';
-import { Contact } from './pages/contact/contact';
-import { Mod } from './pages/mod/mod';
 import { Add } from './pages/add/add';
+import { BookDetail } from './pages/book-detail/book-detail';
+import { Books } from './pages/books/books';
+import { Contact } from './pages/contact/contact';
+import { Home } from './pages/home/home';
+import { Mod } from './pages/mod/mod';
 
 export const routes: Routes = [
   {
@@ -18,8 +19,8 @@ export const routes: Routes = [
       { path: 'books/:id', component: BookDetail },
       { path: 'contact', component: Contact },
       { path: 'mod', component: Mod },
-      { path: 'add', component: Add }
-    ]
+      { path: 'add', component: Add },
+    ],
   },
-  { path: '**', redirectTo: 'home' }
+  { path: '**', redirectTo: 'home' },
 ];

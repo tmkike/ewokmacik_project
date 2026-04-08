@@ -1,7 +1,8 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { connectToDatabase } = require('./db');
+
 const { validateBookPayload } = require('./book-validation');
+const { connectToDatabase } = require('./db');
 
 const router = express.Router();
 
@@ -13,11 +14,28 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function getTrimmedQueryValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function createContainsRegex(value) {
+  return new RegExp(escapeRegExp(value), 'i');
+}
+
+function createExactRegex(value) {
+  return new RegExp(`^${escapeRegExp(value)}$`, 'i');
+}
+
 function buildBooksFilter(query) {
   const filter = {};
+  const search = getTrimmedQueryValue(query.search);
+  const title = getTrimmedQueryValue(query.title);
+  const author = getTrimmedQueryValue(query.author);
+  const genre = getTrimmedQueryValue(query.genre);
 
-  if (query.search) {
-    const searchRegex = new RegExp(escapeRegExp(query.search), 'i');
+  // Az üres vagy szóközös query paraméterek ne szűrjék ki tévesen az összes találatot.
+  if (search) {
+    const searchRegex = createContainsRegex(search);
     filter.$or = [
       { title: searchRegex },
       { author: searchRegex },
@@ -25,26 +43,26 @@ function buildBooksFilter(query) {
     ];
   }
 
-  if (query.title) {
-    filter.title = new RegExp(escapeRegExp(query.title), 'i');
+  if (title) {
+    filter.title = createContainsRegex(title);
   }
 
-  if (query.genre) {
-    filter.genre = new RegExp(`^${escapeRegExp(query.genre)}$`, 'i');
+  if (author) {
+    filter.author = createContainsRegex(author);
   }
 
-  if (query.available !== undefined) {
+  if (genre) {
+    filter.genre = createExactRegex(genre);
+  }
+
+  if (query.available !== undefined && query.available !== '') {
     if (query.available !== 'true' && query.available !== 'false') {
       return {
-        error: 'available query parameter must be true or false',
+        error: 'Az elérhetőség szűrője csak true vagy false lehet.',
       };
     }
 
     filter.available = query.available === 'true';
-  }
-
-  if (query.author) {
-    filter.author = new RegExp(escapeRegExp(query.author), 'i');
   }
 
   return { filter };
@@ -79,14 +97,14 @@ router.get('/:id', async (req, res, next) => {
     const id = parseBookId(req.params.id);
 
     if (!id) {
-      return res.status(400).json({ message: 'Invalid book id' });
+      return res.status(400).json({ message: 'Érvénytelen könyvazonosító.' });
     }
 
     const db = await connectToDatabase();
     const book = await getBooksCollection(db).findOne({ _id: id });
 
     if (!book) {
-      return res.status(404).json({ message: 'Book not found' });
+      return res.status(404).json({ message: 'A könyv nem található.' });
     }
 
     return res.json(book);
@@ -100,7 +118,7 @@ router.post('/', async (req, res, next) => {
     const { book, errors } = validateBookPayload(req.body);
 
     if (errors.length > 0) {
-      return res.status(400).json({ message: 'Invalid book data', errors });
+      return res.status(400).json({ message: 'Érvénytelen könyvadatok.', errors });
     }
 
     const db = await connectToDatabase();
@@ -120,27 +138,30 @@ router.put('/:id', async (req, res, next) => {
     const id = parseBookId(req.params.id);
 
     if (!id) {
-      return res.status(400).json({ message: 'Invalid book id' });
+      return res.status(400).json({ message: 'Érvénytelen könyvazonosító.' });
     }
 
     const { book, errors } = validateBookPayload(req.body);
 
     if (errors.length > 0) {
-      return res.status(400).json({ message: 'Invalid book data', errors });
+      return res.status(400).json({ message: 'Érvénytelen könyvadatok.', errors });
     }
 
     const db = await connectToDatabase();
-    const result = await getBooksCollection(db).findOneAndUpdate(
+    const updatedBook = await getBooksCollection(db).findOneAndUpdate(
       { _id: id },
       { $set: book },
-      { returnDocument: 'after' },
+      {
+        returnDocument: 'after',
+        includeResultMetadata: false,
+      },
     );
 
-    if (!result) {
-      return res.status(404).json({ message: 'Book not found' });
+    if (!updatedBook) {
+      return res.status(404).json({ message: 'A könyv nem található.' });
     }
 
-    return res.json(result);
+    return res.json(updatedBook);
   } catch (error) {
     return next(error);
   }
@@ -151,28 +172,31 @@ router.patch('/:id/availability', async (req, res, next) => {
     const id = parseBookId(req.params.id);
 
     if (!id) {
-      return res.status(400).json({ message: 'Invalid book id' });
+      return res.status(400).json({ message: 'Érvénytelen könyvazonosító.' });
     }
 
-    if (typeof req.body.available !== 'boolean') {
+    if (typeof req.body?.available !== 'boolean') {
       return res.status(400).json({
-        message: 'Invalid availability data',
-        errors: ['available is required and must be a boolean'],
+        message: 'Érvénytelen elérhetőségi adat.',
+        errors: ['Az available mező kötelező, és logikai értéknek kell lennie.'],
       });
     }
 
     const db = await connectToDatabase();
-    const result = await getBooksCollection(db).findOneAndUpdate(
+    const updatedBook = await getBooksCollection(db).findOneAndUpdate(
       { _id: id },
       { $set: { available: req.body.available } },
-      { returnDocument: 'after' },
+      {
+        returnDocument: 'after',
+        includeResultMetadata: false,
+      },
     );
 
-    if (!result) {
-      return res.status(404).json({ message: 'Book not found' });
+    if (!updatedBook) {
+      return res.status(404).json({ message: 'A könyv nem található.' });
     }
 
-    return res.json(result);
+    return res.json(updatedBook);
   } catch (error) {
     return next(error);
   }
@@ -183,14 +207,14 @@ router.delete('/:id', async (req, res, next) => {
     const id = parseBookId(req.params.id);
 
     if (!id) {
-      return res.status(400).json({ message: 'Invalid book id' });
+      return res.status(400).json({ message: 'Érvénytelen könyvazonosító.' });
     }
 
     const db = await connectToDatabase();
     const result = await getBooksCollection(db).deleteOne({ _id: id });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ message: 'Book not found' });
+      return res.status(404).json({ message: 'A könyv nem található.' });
     }
 
     return res.status(204).send();

@@ -17,6 +17,17 @@ label {
   gap: 0.35rem;
 }
 
+.label-text {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.required-marker {
+  color: #b00020;
+  font-weight: 700;
+}
+
 input,
 button {
   border: 1px solid #c8c2b8;

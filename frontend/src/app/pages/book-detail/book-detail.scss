@@ -8,11 +8,20 @@
 }
 
 .back-link {
+  background: transparent;
+  border: 0;
   color: #5b3f2a;
   display: inline-block;
   font-weight: 700;
   margin-bottom: 1rem;
+  padding: 0;
+  text-align: left;
   text-decoration: none;
+}
+
+.back-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .edit-form {
@@ -20,9 +29,28 @@
   gap: 1rem;
 }
 
+.edit-fieldset {
+  border: 0;
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
 label {
   display: grid;
   gap: 0.35rem;
+}
+
+.label-text {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.required-marker {
+  color: #b00020;
+  font-weight: 700;
 }
 
 input,

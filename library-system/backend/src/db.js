@@ -11,18 +11,31 @@ async function connectToDatabase() {
     return db;
   }
 
-  client = new MongoClient(uri);
-  await client.connect();
-  db = client.db(dbName);
-  return db;
+  try {
+    // Az alkalmazás teljes élettartama alatt ugyanazt a klienskapcsolatot használjuk.
+    if (!client) {
+      client = new MongoClient(uri);
+    }
+
+    await client.connect();
+    db = client.db(dbName);
+
+    return db;
+  } catch (error) {
+    client = undefined;
+    db = undefined;
+    throw error;
+  }
 }
 
 async function closeDatabaseConnection() {
-  if (client) {
-    await client.close();
-    client = undefined;
-    db = undefined;
+  if (!client) {
+    return;
   }
+
+  await client.close();
+  client = undefined;
+  db = undefined;
 }
 
 module.exports = {

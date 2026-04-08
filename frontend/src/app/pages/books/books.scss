@@ -35,6 +35,12 @@
   font-weight: 700;
 }
 
+.filter-actions {
+  align-items: end;
+  display: flex;
+  gap: 0.75rem;
+}
+
 input,
 select,
 button {
@@ -47,6 +53,17 @@ button {
   background: #5b3f2a;
   color: #fff;
   cursor: pointer;
+}
+
+.filter-button {
+  align-self: end;
+  min-height: 46px;
+  padding: 0.75rem 1rem;
+  white-space: nowrap;
+}
+
+.filter-button.secondary {
+  background: #8a6b52;
 }
 
 .book-list {
@@ -94,11 +111,11 @@ button {
 
 @media (max-width: 800px) {
   .page-header {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  .page-header {
-    align-items: stretch;
+  .filter-actions {
     flex-direction: column;
   }
 }

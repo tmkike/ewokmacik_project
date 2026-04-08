@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 
 import { Book } from '../../models/book';
 import { BookService } from '../../services/book.service';
@@ -29,14 +30,16 @@ export class Mod {
     this.loading = true;
     this.errorMessage = '';
 
-    this.bookService.getBooks().subscribe({
+    this.bookService.getBooks().pipe(
+      finalize(() => {
+        this.loading = false;
+      }),
+    ).subscribe({
       next: (books) => {
         this.books = books;
-        this.loading = false;
       },
       error: () => {
-        this.errorMessage = 'Nem sikerult betolteni a konyveket.';
-        this.loading = false;
+        this.errorMessage = 'Nem sikerült betölteni a könyveket.';
       },
     });
   }
@@ -56,16 +59,18 @@ export class Mod {
     this.successMessage = '';
     this.errorMessage = '';
 
-    this.bookService.updateBook(this.selectedBook._id, this.selectedBook).subscribe({
+    this.bookService.updateBook(this.selectedBook._id, this.selectedBook).pipe(
+      finalize(() => {
+        this.saving = false;
+      }),
+    ).subscribe({
       next: (updatedBook) => {
         this.books = this.books.map((book) => book._id === updatedBook._id ? updatedBook : book);
         this.selectedBook = { ...updatedBook };
-        this.successMessage = 'A konyv sikeresen modositva.';
-        this.saving = false;
+        this.successMessage = 'A könyv sikeresen módosítva.';
       },
       error: () => {
-        this.errorMessage = 'Nem sikerult modositani a konyvet.';
-        this.saving = false;
+        this.errorMessage = 'Nem sikerült módosítani a könyvet.';
       },
     });
   }
@@ -78,31 +83,34 @@ export class Mod {
     this.bookService.updateAvailability(book._id, !book.available).subscribe({
       next: (updatedBook) => {
         this.books = this.books.map((item) => item._id === updatedBook._id ? updatedBook : item);
+
         if (this.selectedBook?._id === updatedBook._id) {
           this.selectedBook = { ...updatedBook };
         }
       },
       error: () => {
-        this.errorMessage = 'Nem sikerult modositani az elerhetoseget.';
+        this.errorMessage = 'Nem sikerült módosítani az elérhetőséget.';
       },
     });
   }
 
   deleteBook(book: Book): void {
-    if (!book._id || !confirm(`Biztosan torlod ezt a konyvet: ${book.title}?`)) {
+    if (!book._id || !confirm(`Biztosan törlöd ezt a könyvet: ${book.title}?`)) {
       return;
     }
 
     this.bookService.deleteBook(book._id).subscribe({
       next: () => {
         this.books = this.books.filter((item) => item._id !== book._id);
+
         if (this.selectedBook?._id === book._id) {
           this.selectedBook = undefined;
         }
-        this.successMessage = 'A konyv sikeresen torolve.';
+
+        this.successMessage = 'A könyv sikeresen törölve.';
       },
       error: () => {
-        this.errorMessage = 'Nem sikerult torolni a konyvet.';
+        this.errorMessage = 'Nem sikerült törölni a könyvet.';
       },
     });
   }

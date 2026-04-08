@@ -1,10 +1,18 @@
 <section class="book-detail-page">
   <div class="book-detail-card">
-    <a class="back-link" routerLink="/books">Vissza a konyvekhez</a>
+    <button
+      type="button"
+      class="back-link"
+      [disabled]="saving"
+      (click)="goBackToBooks()"
+    >
+      Vissza a könyvekhez
+    </button>
 
-    <p class="status" *ngIf="loading">Konyv betoltese...</p>
+    <p class="status" *ngIf="loading">Könyv betöltése...</p>
+    <p class="status" *ngIf="saving">Mentés folyamatban...</p>
     <p class="status" *ngIf="bookId && !book && !loading && !errorMessage">
-      Nincs betoltott konyv ehhez az azonositóhoz: {{ bookId }}
+      Nincs betöltött könyv ehhez az azonosítóhoz: {{ bookId }}
     </p>
     <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
@@ -12,38 +20,39 @@
     <form *ngIf="book" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
       <h1>{{ book.title }}</h1>
 
-      <label>
-        Cim
-        <input type="text" name="title" required [(ngModel)]="book.title" />
-      </label>
+      <fieldset class="edit-fieldset" [disabled]="saving">
+        <label>
+          <span class="label-text">Cím <span class="required-marker">*</span></span>
+          <input type="text" name="title" required [(ngModel)]="book.title" />
+        </label>
 
-      <label>
-        Szerzo
-        <input type="text" name="author" required [(ngModel)]="book.author" />
-      </label>
+        <label>
+          <span class="label-text">Szerző <span class="required-marker">*</span></span>
+          <input type="text" name="author" required [(ngModel)]="book.author" />
+        </label>
 
-      <label>
-        Kiadas eve
-        <input type="number" name="year" required min="0" [(ngModel)]="book.year" />
-      </label>
+        <label>
+          <span class="label-text">Kiadás éve <span class="required-marker">*</span></span>
+          <input type="number" name="year" required min="0" [(ngModel)]="book.year" />
+        </label>
 
-      <label>
-        Kategoria
-        <input type="text" name="genre" required [(ngModel)]="book.genre" />
-      </label>
+        <label>
+          <span class="label-text">Kategória <span class="required-marker">*</span></span>
+          <input type="text" name="genre" required [(ngModel)]="book.genre" />
+        </label>
 
-      <label class="checkbox-row">
-        <input type="checkbox" name="available" [(ngModel)]="book.available" />
-        Elerheto
-      </label>
+        <label class="checkbox-row">
+          <input type="checkbox" name="available" [(ngModel)]="book.available" />
+          Elérhető
+        </label>
 
-      <div class="form-actions">
-        <button type="submit" [disabled]="editForm.invalid || saving">
-          {{ saving ? 'Mentes...' : 'Mentes' }}
-        </button>
-        <button type="button" (click)="toggleAvailability()">Elerhetoseg valtasa</button>
-        <button type="button" class="danger" (click)="deleteBook()">Torles</button>
-      </div>
+        <div class="form-actions">
+          <button type="submit" [disabled]="editForm.invalid || saving">
+            {{ saving ? 'Mentés...' : 'Mentés' }}
+          </button>
+          <button type="button" class="danger" [disabled]="saving" (click)="deleteBook()">Törlés</button>
+        </div>
+      </fieldset>
     </form>
   </div>
 </section>
