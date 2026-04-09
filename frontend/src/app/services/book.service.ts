@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { Book, BookFilters } from '../models/book';
+import { Book, BookFilters, BookListResponse } from '../models/book';
 
 @Injectable({
   providedIn: 'root',
@@ -13,7 +13,7 @@ export class BookService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getBooks(filters: BookFilters = {}): Observable<Book[]> {
+  getBooks(filters: BookFilters = {}): Observable<BookListResponse> {
     let params = new HttpParams();
 
     if (filters.title) {
@@ -32,7 +32,15 @@ export class BookService {
       params = params.set('available', String(filters.available));
     }
 
-    return this.http.get<Book[]>(this.apiUrl, { params });
+    if (typeof filters.page === 'number') {
+      params = params.set('page', String(filters.page));
+    }
+
+    if (typeof filters.pageSize === 'number') {
+      params = params.set('pageSize', String(filters.pageSize));
+    }
+
+    return this.http.get<BookListResponse>(this.apiUrl, { params });
   }
 
   getBook(id: string): Observable<Book> {

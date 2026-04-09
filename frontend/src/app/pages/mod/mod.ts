@@ -30,13 +30,13 @@ export class Mod {
     this.loading = true;
     this.errorMessage = '';
 
-    this.bookService.getBooks().pipe(
+    this.bookService.getBooks({ page: 1, pageSize: 50 }).pipe(
       finalize(() => {
         this.loading = false;
       }),
     ).subscribe({
-      next: (books) => {
-        this.books = books;
+      next: (response) => {
+        this.books = response.items;
       },
       error: () => {
         this.errorMessage = 'Nem sikerült betölteni a könyveket.';

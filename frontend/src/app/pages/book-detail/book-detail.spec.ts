@@ -586,4 +586,12 @@ describe('BookDetail', () => {
     expect(component.activeLoan?._id).toBe('loan-1');
     expect(component.showLoanTerminationButton).toBe(true);
   });
+
+  it('should keep API date values on the same calendar day when filling the loan form', () => {
+    expect(component['toDateValue']('2026-04-15T00:00:00Z')).toBe('2026-04-15');
+  });
+
+  it('should format API date values without timezone drift', () => {
+    expect(component.formatLoanDateLabel('2026-04-15T00:00:00Z')).toBe('2026.04.15.');
+  });
 });

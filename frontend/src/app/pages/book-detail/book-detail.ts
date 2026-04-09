@@ -10,6 +10,7 @@ import { Loan, LoanCreatePayload } from '../../models/loan';
 import { BookService } from '../../services/book.service';
 import { LoanService } from '../../services/loan.service';
 import { BOOK_AVAILABILITY_LABELS } from '../../shared/book-availability';
+import { extractDateOnly, formatDateOnlyLabel, isIsoDateOnly } from '../../shared/date-only';
 
 type LoanFormModel = {
   borrowerName: string;
@@ -521,7 +522,7 @@ export class BookDetail implements OnInit {
   }
 
   private toIsoDate(value: string): string {
-    return value;
+    return isIsoDateOnly(value) ? value : '';
   }
 
   private validateLoanForm(): string | null {
@@ -543,6 +544,10 @@ export class BookDetail implements OnInit {
 
     if (!dueAt) {
       return 'Add meg a kölcsönzés határidejét.';
+    }
+
+    if (!isIsoDateOnly(dueAt)) {
+      return 'A határidő formátuma YYYY-MM-DD legyen.';
     }
 
     if (dueAt < this.minimumLoanDueDate) {
@@ -580,11 +585,7 @@ export class BookDetail implements OnInit {
   }
 
   private toDateValue(value: string | null): string {
-    if (!value) {
-      return '';
-    }
-
-    return this.toLocalDateValue(new Date(value));
+    return extractDateOnly(value);
   }
 
   private isValidEmail(value: string): boolean {
@@ -597,21 +598,7 @@ export class BookDetail implements OnInit {
   }
 
   formatLoanDateLabel(value: string | null | undefined): string {
-    if (!value) {
-      return 'Nincs megadva';
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return 'Nincs megadva';
-    }
-
-    return new Intl.DateTimeFormat('hu-HU', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    return formatDateOnlyLabel(value);
   }
 
   private toLocalDateValue(value: Date): string {

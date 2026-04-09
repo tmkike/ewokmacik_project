@@ -1,13 +1,63 @@
-name: Build and Push Container Images
+name: Build, Test and Push Container Images
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
   workflow_dispatch:
 
 jobs:
+  verify-stack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build and start the library stack
+        run: docker compose -f library-system/docker-compose.yml up -d --build
+
+      - name: Wait for services to become healthy
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:3000/health >/dev/null \
+              && curl --fail --silent http://localhost:3001/health >/dev/null \
+              && curl --fail --silent http://localhost:3002/health >/dev/null; then
+              exit 0
+            fi
+
+            echo "A szolgáltatások még indulnak, újrapróbálás 10 másodperc múlva..."
+            sleep 10
+          done
+
+          echo "A szolgáltatások nem álltak fel időben."
+          docker compose -f library-system/docker-compose.yml ps
+          exit 1
+
+      - name: Run integration tests
+        run: dotnet test library-system/tests/LibrarySystem.StackTests/LibrarySystem.StackTests.csproj
+        env:
+          LIBRARY_BASE_URL: http://localhost:3000
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f library-system/docker-compose.yml logs --no-color
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose -f library-system/docker-compose.yml down -v --remove-orphans
+
   build-and-push:
+    if: github.event_name != 'pull_request'
+    needs: verify-stack
     runs-on: ubuntu-latest
 
     permissions:

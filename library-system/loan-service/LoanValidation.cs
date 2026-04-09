@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 
 static class LoanValidation
@@ -21,12 +20,12 @@ static class LoanValidation
         if (borrowerEmail is null) errors.Add("A kölcsönző e-mail-címe kötelező.");
         else if (!IsValidEmail(borrowerEmail)) errors.Add("A kölcsönző e-mail-címe érvénytelen.");
         if (string.IsNullOrWhiteSpace(request.DueAt)) errors.Add("A határidő megadása kötelező.");
-        if (!TryParseClientDate(request.DueAt, out var dueAt)) errors.Add("A visszahozási határidő érvénytelen.");
-        if (dueAt is not null && dueAt.Value < DateTime.UtcNow) errors.Add("A határidő nem lehet korábbi, mint a kölcsönzés dátuma.");
+        if (!LoanDateRules.TryParseClientDate(request.DueAt, out var dueDate)) errors.Add("A visszahozási határidő érvénytelen. A formátum legyen YYYY-MM-DD.");
+        if (LoanDateRules.TryParseClientDate(request.DueAt, out dueDate) && dueDate < LoanDateRules.GetCurrentUtcDate()) errors.Add("A határidő nem lehet korábbi, mint a mai nap.");
 
         return errors.Count > 0
             ? (null, errors.ToArray())
-            : (new ValidatedLoanCreatePayload(bookId, borrowerName!, borrowerEmail!, dueAt!.Value, notes), []);
+            : (new ValidatedLoanCreatePayload(bookId, borrowerName!, borrowerEmail!, dueDate, notes), []);
     }
 
     public static (ValidatedLoanUpdatePayload? Payload, string[] Errors) ValidateLoanUpdatePayload(LoanUpdateRequest? request)
@@ -45,23 +44,23 @@ static class LoanValidation
         if (borrowerEmail is null) errors.Add("A kölcsönző e-mail-címe kötelező.");
         else if (!IsValidEmail(borrowerEmail)) errors.Add("A kölcsönző e-mail-címe érvénytelen.");
         if (string.IsNullOrWhiteSpace(request.DueAt)) errors.Add("A határidő megadása kötelező.");
-        if (!TryParseClientDate(request.DueAt, out var dueAt)) errors.Add("A visszahozási határidő érvénytelen.");
+        if (!LoanDateRules.TryParseClientDate(request.DueAt, out var dueDate)) errors.Add("A visszahozási határidő érvénytelen. A formátum legyen YYYY-MM-DD.");
 
         return errors.Count > 0
             ? (null, errors.ToArray())
-            : (new ValidatedLoanUpdatePayload(borrowerName!, borrowerEmail!, dueAt!.Value, notes), []);
+            : (new ValidatedLoanUpdatePayload(borrowerName!, borrowerEmail!, dueDate, notes), []);
     }
 
     public static (ValidatedLoanReturnPayload? Payload, string[] Errors) ValidateLoanReturnPayload(LoanReturnRequest? request)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.ReturnedAt))
         {
-            return (new ValidatedLoanReturnPayload(DateTime.UtcNow), []);
+            return (new ValidatedLoanReturnPayload(LoanDateRules.GetCurrentUtcDate()), []);
         }
 
-        return TryParseClientDate(request.ReturnedAt, out var returnedAt)
-            ? (new ValidatedLoanReturnPayload(returnedAt!.Value), [])
-            : (null, ["A visszahozás dátuma érvénytelen."]);
+        return LoanDateRules.TryParseClientDate(request.ReturnedAt, out var returnedDate)
+            ? (new ValidatedLoanReturnPayload(returnedDate), [])
+            : (null, ["A visszahozás dátuma érvénytelen. A formátum legyen YYYY-MM-DD."]);
     }
 
     private static string? NormalizeRequiredString(string? value)
@@ -75,28 +74,4 @@ static class LoanValidation
 
     private static bool IsValidEmail(string value)
         => Regex.IsMatch(value, @"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
-    private static bool TryParseClientDate(string? value, out DateTime? parsedDate)
-    {
-        parsedDate = null;
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var success = DateTime.TryParse(
-            value,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-            out var date);
-
-        if (!success)
-        {
-            return false;
-        }
-
-        parsedDate = date;
-        return true;
-    }
 }

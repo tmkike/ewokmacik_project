@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,17 @@ builder.Services.AddCors(options =>
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Library System Loan Service API",
+        Version = "v1",
+        Description = "A kölcsönzéskezelő mikroszerviz publikus API-ja.",
+    });
 });
 
 builder.Services.AddHttpClient<BookServiceClient>(client =>
@@ -72,9 +84,16 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.UseCors();
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Loan Service API v1");
+});
+
 // Az indexek induláskor készülnek el, így futás közben már nem kell ezzel foglalkozni.
 await app.Services.GetRequiredService<MongoDbContext>().EnsureIndexesAsync();
-app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "loan-service" }));
+app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "loan-service" }))
+    .WithTags("Health");
 // A kölcsönzési végpontok külön modulban maradnak, hogy a Program.cs rövid és áttekinthető legyen.
 LoanApi.Map(app);
 

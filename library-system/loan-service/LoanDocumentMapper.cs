@@ -22,7 +22,7 @@ static class LoanDocumentMapper
             BorrowerEmail = payload.BorrowerEmail,
             Notes = payload.Notes,
             LoanedAt = now,
-            DueAt = payload.DueAt,
+            DueAt = LoanDateRules.ToUtcDateTime(payload.DueDate),
             ReturnedAt = null,
             Status = "active",
             CreatedAt = now,

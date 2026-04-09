@@ -3,14 +3,21 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
+import { Book } from '../../models/book';
 import { BookService } from '../../services/book.service';
 import { Books } from './books';
 
 describe('Books', () => {
   let component: Books;
   let fixture: ComponentFixture<Books>;
+
   const bookServiceMock = {
-    getBooks: vi.fn(() => of([])),
+    getBooks: vi.fn(() => of({
+      items: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 50,
+    })),
   };
 
   beforeEach(async () => {
@@ -33,23 +40,123 @@ describe('Books', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should request filtered books from the backend', () => {
-    bookServiceMock.getBooks.mockClear();
-    component.filters = {
+  it('should load every book immediately on open', () => {
+    component.ngOnInit();
+
+    expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 50,
+    });
+    expect(component.books).toEqual([]);
+  });
+
+  it('should reset stale filters when the page is opened', () => {
+    component.filterForm.setValue({
       title: 'Dune',
       author: 'Frank Herbert',
       genre: 'Science Fiction',
-      available: true,
-    };
+      available: false,
+    });
 
-    component.applyFilters();
+    component.ngOnInit();
+
+    expect(component.filterForm.getRawValue()).toEqual({
+      title: '',
+      author: '',
+      genre: '',
+      available: null,
+    });
+  });
+
+  it('should send the current filters to the backend when searching', () => {
+    const filteredBooks = [createBook({ title: 'Dune', author: 'Frank Herbert' })];
+
+    mockBooksResponse(filteredBooks);
+    component.filterForm.setValue({
+      title: 'Dune',
+      author: 'Frank Herbert',
+      genre: 'Science',
+      available: true,
+    });
+
+    component.searchBooks();
 
     expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
       title: 'Dune',
       author: 'Frank Herbert',
-      genre: 'Science Fiction',
+      genre: 'Science',
       available: true,
+      page: 1,
+      pageSize: 50,
     });
+    expect(component.books).toEqual(filteredBooks);
+  });
+
+  it('should omit empty text filters and keep the all availability state', () => {
+    mockBooksResponse([]);
+    component.filterForm.setValue({
+      title: '  ',
+      author: '',
+      genre: '',
+      available: null,
+    });
+
+    component.searchBooks();
+
+    expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 50,
+    });
+  });
+
+  it('should send the unavailable filter to the backend', () => {
+    const filteredBooks = [createBook({ title: '1984', available: false, hasActiveLoan: true })];
+
+    mockBooksResponse(filteredBooks);
+    component.filterForm.setValue({
+      title: '',
+      author: '',
+      genre: '',
+      available: false,
+    });
+
+    component.searchBooks();
+
+    expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
+      available: false,
+      page: 1,
+      pageSize: 50,
+    });
+    expect(component.books).toEqual(filteredBooks);
+  });
+
+  it('should clear filters and reload every book', () => {
+    const loadedBooks = [
+      createBook({ title: 'Dune', available: true }),
+      createBook({ title: '1984', available: false, hasActiveLoan: true }),
+    ];
+
+    mockBooksResponse(loadedBooks);
+    component.filterForm.setValue({
+      title: '1984',
+      author: 'George Orwell',
+      genre: 'Dystopian',
+      available: false,
+    });
+
+    component.clearFilters();
+
+    expect(component.filterForm.getRawValue()).toEqual({
+      title: '',
+      author: '',
+      genre: '',
+      available: null,
+    });
+    expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 50,
+    });
+    expect(component.books).toEqual(loadedBooks);
   });
 
   it('should clear the success message after 1.5 seconds', () => {
@@ -74,26 +181,39 @@ describe('Books', () => {
   });
 
   it('should label books with an active loan as borrowed', () => {
-    expect(component.getBookAvailabilityLabel({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
+    expect(component.getBookAvailabilityLabel(createBook({
       available: false,
       hasActiveLoan: true,
-    })).toBe('Kikölcsönözve');
+    }))).toBe('Kikölcsönözve');
   });
 
   it('should keep regular unavailable books distinct from borrowed ones', () => {
-    expect(component.getBookAvailabilityLabel({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
+    expect(component.getBookAvailabilityLabel(createBook({
       available: false,
       hasActiveLoan: false,
-    })).toBe('Nem elérhető');
+    }))).toBe('Nem elérhető');
   });
+
+  function mockBooksResponse(books: Book[]): void {
+    bookServiceMock.getBooks.mockClear();
+    bookServiceMock.getBooks.mockReturnValueOnce(of({
+      items: books,
+      totalCount: books.length,
+      page: 1,
+      pageSize: 50,
+    }));
+  }
 });
+
+function createBook(overrides: Partial<Book> = {}): Book {
+  return {
+    _id: 'book-default',
+    title: 'Alapértelmezett könyv',
+    author: 'Alapértelmezett szerző',
+    year: 2000,
+    genre: 'Regény',
+    available: true,
+    hasActiveLoan: false,
+    ...overrides,
+  };
+}

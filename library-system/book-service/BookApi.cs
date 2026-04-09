@@ -5,17 +5,27 @@ static class BookApi
 {
     public static void Map(WebApplication app)
     {
-        var books = app.MapGroup("/api/books");
-        books.MapGet("/", GetBooksAsync);
-        books.MapGet("/{id}", GetBookByIdAsync);
-        books.MapPost("/", CreateBookAsync);
-        books.MapPut("/{id}", UpdateBookAsync);
-        books.MapPatch("/{id}/availability", UpdateBookAvailabilityAsync);
-        books.MapDelete("/{id}", DeleteBookAsync);
+        var books = app.MapGroup("/api/books")
+            .WithTags("Books");
+
+        books.MapGet("/", GetBooksAsync)
+            .WithName("GetBooks");
+        books.MapGet("/{id}", GetBookByIdAsync)
+            .WithName("GetBookById");
+        books.MapPost("/", CreateBookAsync)
+            .WithName("CreateBook");
+        books.MapPut("/{id}", UpdateBookAsync)
+            .WithName("UpdateBook");
+        books.MapPatch("/{id}/availability", UpdateBookAvailabilityAsync)
+            .WithName("UpdateBookAvailability");
+        books.MapDelete("/{id}", DeleteBookAsync)
+            .WithName("DeleteBook");
 
         var internalBooks = app.MapGroup("/internal/books");
-        internalBooks.MapPost("/{id}/reserve", ReserveBookAsync);
-        internalBooks.MapPost("/{id}/release", ReleaseBookAsync);
+        internalBooks.MapPost("/{id}/reserve", ReserveBookAsync)
+            .ExcludeFromDescription();
+        internalBooks.MapPost("/{id}/release", ReleaseBookAsync)
+            .ExcludeFromDescription();
     }
 
     private static async Task<IResult> GetBooksAsync(
@@ -24,22 +34,44 @@ static class BookApi
         LoanServiceClient loanServiceClient,
         CancellationToken cancellationToken)
     {
-        var filterResult = BookValidation.BuildBooksFilter(request.Query);
+        var queryOptions = BookValidation.BuildBooksFilter(request.Query);
 
-        if (filterResult.ErrorMessage is not null)
+        if (queryOptions.ErrorMessage is not null)
         {
-            return Results.BadRequest(new ErrorResponse(filterResult.ErrorMessage));
+            return Results.BadRequest(new ErrorResponse(queryOptions.ErrorMessage));
         }
 
+        var totalCount = await db.Books.CountDocumentsAsync(queryOptions.Filter, cancellationToken: cancellationToken);
+
+        var totalPages = totalCount == 0
+            ? 1
+            : (int)Math.Ceiling(totalCount / (double)queryOptions.PageSize);
+        var currentPage = Math.Min(queryOptions.Page, totalPages);
+
         var books = await db.Books
-            .Find(filterResult.Filter)
-            .Sort(Builders<BookDocument>.Sort.Ascending(book => book.Title))
+            .Find(queryOptions.Filter)
+            .Sort(Builders<BookDocument>.Sort
+                .Ascending(book => book.Title)
+                .Ascending(book => book.Author))
+            .Skip((currentPage - 1) * queryOptions.PageSize)
+            .Limit(queryOptions.PageSize)
             .ToListAsync(cancellationToken);
 
-        var activeLoanBookIds = await loanServiceClient.GetActiveLoanBookIdsAsync(cancellationToken);
-        return Results.Ok(books.Select(book => BookDocumentMapper.MapBookResponse(
-            book,
-            activeLoanBookIds.Contains(BookDocumentMapper.GetId(book)))));
+        var activeLoanBookIds = books.Count == 0
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : await loanServiceClient.GetActiveLoanBookIdsAsync(cancellationToken);
+
+        var items = books
+            .Select(book => BookDocumentMapper.MapBookResponse(
+                book,
+                activeLoanBookIds.Contains(BookDocumentMapper.GetId(book))))
+            .ToArray();
+
+        return Results.Ok(new BookListResponse(
+            items,
+            totalCount > int.MaxValue ? int.MaxValue : (int)totalCount,
+            currentPage,
+            queryOptions.PageSize));
     }
 
     private static async Task<IResult> GetBookByIdAsync(
@@ -66,7 +98,10 @@ static class BookApi
         return Results.Ok(BookDocumentMapper.MapBookDetailResponse(book, activeLoan));
     }
 
-    private static async Task<IResult> CreateBookAsync(BookUpsertRequest? request, MongoDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> CreateBookAsync(
+        BookUpsertRequest? request,
+        MongoDbContext db,
+        CancellationToken cancellationToken)
     {
         var validationResult = BookValidation.ValidateBookPayload(request);
 
@@ -212,7 +247,9 @@ static class BookApi
             return Results.Ok(BookDocumentMapper.MapBookInventoryResponse(reservedBook));
         }
 
-        var exists = await db.Books.Find(Builders<BookDocument>.Filter.Eq(book => book.Id, bookId)).AnyAsync(cancellationToken);
+        var exists = await db.Books
+            .Find(Builders<BookDocument>.Filter.Eq(book => book.Id, bookId))
+            .AnyAsync(cancellationToken);
 
         return !exists
             ? Results.NotFound(new ErrorResponse("A könyv nem található."))

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,17 @@ builder.Services.AddCors(options =>
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Library System Book Service API",
+        Version = "v1",
+        Description = "A könyvkezelő mikroszerviz publikus API-ja.",
+    });
 });
 
 builder.Services.AddHttpClient<LoanServiceClient>(client =>
@@ -70,9 +82,16 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.UseCors();
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Book Service API v1");
+});
+
 // Az indexek induláskor készülnek el, így a lekérdezések már stabilabb sémára támaszkodhatnak.
 await app.Services.GetRequiredService<MongoDbContext>().EnsureIndexesAsync();
-app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "book-service" }));
+app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "book-service" }))
+    .WithTags("Health");
 // Az összes könyvvel kapcsolatos publikus és belső végpont külön modulban marad.
 BookApi.Map(app);
 

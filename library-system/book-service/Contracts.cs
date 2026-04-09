@@ -11,7 +11,11 @@ sealed record BookAvailabilityRequest(bool? Available);
 
 sealed record ValidatedBookPayload(string Title, string Author, int Year, string Genre, bool Available);
 
-sealed record BookQueryFilterResult(FilterDefinition<BookDocument> Filter, string? ErrorMessage);
+sealed record BookQueryFilterResult(
+    FilterDefinition<BookDocument> Filter,
+    int Page,
+    int PageSize,
+    string? ErrorMessage);
 
 sealed record BookInventoryResponse(
     [property: JsonPropertyName("_id")] string Id,
@@ -29,6 +33,12 @@ sealed record BookResponse(
     string Genre,
     bool Available,
     bool HasActiveLoan = false);
+
+sealed record BookListResponse(
+    IReadOnlyList<BookResponse> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
 
 sealed record BookDetailResponse(
     [property: JsonPropertyName("_id")] string Id,

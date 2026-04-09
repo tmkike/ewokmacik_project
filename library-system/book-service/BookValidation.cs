@@ -5,6 +5,10 @@ using MongoDB.Driver;
 
 static class BookValidation
 {
+    private const int DefaultPage = 1;
+    private const int DefaultPageSize = 8;
+    private const int MaxPageSize = 50;
+
     public static BookQueryFilterResult BuildBooksFilter(IQueryCollection query)
     {
         var filters = new List<FilterDefinition<BookDocument>>();
@@ -33,7 +37,7 @@ static class BookValidation
 
         if (!string.IsNullOrWhiteSpace(genre))
         {
-            filters.Add(Builders<BookDocument>.Filter.Regex(book => book.Genre, Exact(genre)));
+            filters.Add(Builders<BookDocument>.Filter.Regex(book => book.Genre, Contains(genre)));
         }
 
         var available = query["available"].ToString();
@@ -42,16 +46,31 @@ static class BookValidation
         {
             if (!bool.TryParse(available, out var availableValue))
             {
-                return new BookQueryFilterResult(
-                    Builders<BookDocument>.Filter.Empty,
-                    "Az elérhetőség szűrője csak true vagy false lehet.");
+                return CreateError("Az elérhetőség szűrője csak true vagy false lehet.");
             }
 
             filters.Add(Builders<BookDocument>.Filter.Eq(book => book.Available, availableValue));
         }
 
+        if (!TryParsePositiveInt(query["page"], DefaultPage, out var page))
+        {
+            return CreateError("Az oldalszám csak pozitív egész szám lehet.");
+        }
+
+        if (!TryParsePositiveInt(query["pageSize"], DefaultPageSize, out var pageSize))
+        {
+            return CreateError("Az oldalméret csak pozitív egész szám lehet.");
+        }
+
+        if (pageSize > MaxPageSize)
+        {
+            return CreateError($"Az oldalméret legfeljebb {MaxPageSize} lehet.");
+        }
+
         return new BookQueryFilterResult(
             filters.Count == 0 ? Builders<BookDocument>.Filter.Empty : Builders<BookDocument>.Filter.And(filters),
+            page,
+            pageSize,
             null);
     }
 
@@ -78,6 +97,33 @@ static class BookValidation
             : (new ValidatedBookPayload(title!, author!, request.Year!.Value, genre!, request.Available!.Value), []);
     }
 
+    private static BookQueryFilterResult CreateError(string message)
+    {
+        return new BookQueryFilterResult(
+            Builders<BookDocument>.Filter.Empty,
+            DefaultPage,
+            DefaultPageSize,
+            message);
+    }
+
+    private static bool TryParsePositiveInt(string? rawValue, int defaultValue, out int parsedValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            parsedValue = defaultValue;
+            return true;
+        }
+
+        if (int.TryParse(rawValue, out var value) && value > 0)
+        {
+            parsedValue = value;
+            return true;
+        }
+
+        parsedValue = defaultValue;
+        return false;
+    }
+
     private static string? NormalizeRequiredString(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -91,5 +137,4 @@ static class BookValidation
 
     private static BsonRegularExpression Contains(string value) => new(Regex.Escape(value), "i");
 
-    private static BsonRegularExpression Exact(string value) => new($"^{Regex.Escape(value)}$", "i");
 }

@@ -15,5 +15,14 @@ export interface BookFilters {
   title?: string;
   genre?: string;
   author?: string;
-  available?: boolean | '' | null;
+  available?: boolean | null;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface BookListResponse {
+  items: Book[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
 }

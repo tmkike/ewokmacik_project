@@ -76,17 +76,23 @@ public sealed class GatewayFlowTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CanFilterBooksServerSideByTitleAndAvailability()
+    public async Task CanFilterAndPageBooksThroughGateway()
     {
         var titlePrefix = $"Szűrő teszt {Guid.NewGuid():N}";
-        var availableBook = await CreateBookAsync(new BookUpsertRequest(
+        var firstBook = await CreateBookAsync(new BookUpsertRequest(
             Title: $"{titlePrefix} A",
             Author: "Automata Teszt",
-            Year: 2026,
+            Year: 2024,
             Genre: "Szűrő",
             Available: true));
-        var unavailableBook = await CreateBookAsync(new BookUpsertRequest(
+        var secondBook = await CreateBookAsync(new BookUpsertRequest(
             Title: $"{titlePrefix} B",
+            Author: "Automata Teszt",
+            Year: 2025,
+            Genre: "Szűrő",
+            Available: true));
+        var thirdBook = await CreateBookAsync(new BookUpsertRequest(
+            Title: $"{titlePrefix} C",
             Author: "Automata Teszt",
             Year: 2026,
             Genre: "Szűrő",
@@ -94,21 +100,30 @@ public sealed class GatewayFlowTests : IAsyncLifetime
 
         try
         {
-            var availableBooks = await GetJsonAsync<List<BookResponse>>(
-                $"api/books?title={Uri.EscapeDataString(titlePrefix)}&available=true");
-            var unavailableBooks = await GetJsonAsync<List<BookResponse>>(
-                $"api/books?title={Uri.EscapeDataString(titlePrefix)}&available=false");
+            var firstPage = await GetJsonAsync<BookListResponse>(
+                $"api/books?title={Uri.EscapeDataString(titlePrefix)}&page=1&pageSize=2");
+            var secondPage = await GetJsonAsync<BookListResponse>(
+                $"api/books?title={Uri.EscapeDataString(titlePrefix)}&page=2&pageSize=2");
+            var availableOnly = await GetJsonAsync<BookListResponse>(
+                $"api/books?title={Uri.EscapeDataString(titlePrefix)}&available=true&page=1&pageSize=10");
 
-            Assert.Contains(availableBooks, book => book.Id == availableBook.Id);
-            Assert.DoesNotContain(availableBooks, book => book.Id == unavailableBook.Id);
+            Assert.Equal(3, firstPage.TotalCount);
+            Assert.Equal(2, firstPage.Items.Count);
+            Assert.Equal(firstBook.Id, firstPage.Items[0].Id);
+            Assert.Equal(secondBook.Id, firstPage.Items[1].Id);
 
-            Assert.Contains(unavailableBooks, book => book.Id == unavailableBook.Id);
-            Assert.DoesNotContain(unavailableBooks, book => book.Id == availableBook.Id);
+            Assert.Single(secondPage.Items);
+            Assert.Equal(thirdBook.Id, secondPage.Items[0].Id);
+
+            Assert.Equal(2, availableOnly.TotalCount);
+            Assert.All(availableOnly.Items, book => Assert.True(book.Available));
+            Assert.DoesNotContain(availableOnly.Items, book => book.Id == thirdBook.Id);
         }
         finally
         {
-            await TryDeleteBookAsync(availableBook.Id);
-            await TryDeleteBookAsync(unavailableBook.Id);
+            await TryDeleteBookAsync(firstBook.Id);
+            await TryDeleteBookAsync(secondBook.Id);
+            await TryDeleteBookAsync(thirdBook.Id);
         }
     }
 
@@ -260,6 +275,12 @@ public sealed class GatewayFlowTests : IAsyncLifetime
         string Genre,
         bool Available,
         bool HasActiveLoan);
+
+    private sealed record BookListResponse(
+        IReadOnlyList<BookResponse> Items,
+        int TotalCount,
+        int Page,
+        int PageSize);
 
     private sealed record LoanResponse(
         [property: JsonPropertyName("_id")] string Id,

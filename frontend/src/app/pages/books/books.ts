@@ -1,9 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ChangeDetectorRef, Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subject, debounceTime, distinctUntilChanged, finalize, skip } from 'rxjs';
+import { skip } from 'rxjs';
 
 import { Book, BookFilters } from '../../models/book';
 import { BookService } from '../../services/book.service';
@@ -11,22 +11,26 @@ import { getBookAvailabilityLabel } from '../../shared/book-availability';
 
 @Component({
   selector: 'app-books',
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './books.html',
   styleUrl: './books.scss',
 })
 export class Books implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
-  private readonly filterChanges = new Subject<BookFilters>();
-  private loadRequestId = 0;
   private successMessageTimeoutId?: ReturnType<typeof setTimeout>;
+
+  readonly filterForm = new FormGroup({
+    title: new FormControl('', { nonNullable: true }),
+    author: new FormControl('', { nonNullable: true }),
+    genre: new FormControl('', { nonNullable: true }),
+    available: new FormControl<boolean | null>(null),
+  });
 
   books: Book[] = [];
   loading = false;
   errorMessage = '';
   successMessage = '';
   successMessageVisible = false;
-  filters: BookFilters = this.createEmptyFilters();
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -36,6 +40,7 @@ export class Books implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.resetFiltersForPageEntry();
     this.readNavigationMessage();
     this.loadBooks();
 
@@ -45,62 +50,18 @@ export class Books implements OnInit, OnDestroy {
     ).subscribe(() => {
       this.refreshBooks(true);
     });
-
-    this.filterChanges.pipe(
-      debounceTime(300),
-      distinctUntilChanged((previous, current) => JSON.stringify(previous) === JSON.stringify(current)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe((filters) => {
-      this.loadBooks(filters);
-    });
   }
 
   ngOnDestroy(): void {
     this.clearSuccessMessageTimeout();
   }
 
-  loadBooks(filters: BookFilters = this.createFilterSnapshot()): void {
-    const requestId = ++this.loadRequestId;
-    this.loading = true;
-    this.errorMessage = '';
-
-    // A szűrés a backendben történik, így nagyobb adatmennyiségnél sem kell mindent letölteni.
-    this.bookService.getBooks(filters).pipe(
-      finalize(() => {
-        if (requestId === this.loadRequestId) {
-          this.loading = false;
-        }
-      }),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (books) => {
-        if (requestId !== this.loadRequestId) {
-          return;
-        }
-
-        this.books = books;
-      },
-      error: () => {
-        if (requestId !== this.loadRequestId) {
-          return;
-        }
-
-        this.errorMessage = 'Nem sikerült betölteni a könyveket.';
-        this.books = [];
-      },
-    });
-  }
-
-  onFiltersChanged(): void {
-    this.filterChanges.next(this.createFilterSnapshot());
-  }
-
-  applyFilters(): void {
+  searchBooks(): void {
     this.loadBooks();
   }
 
   clearFilters(): void {
-    this.filters = this.createEmptyFilters();
+    this.resetFiltersForPageEntry();
     this.loadBooks();
   }
 
@@ -129,10 +90,31 @@ export class Books implements OnInit, OnDestroy {
       : 'availability availability--unavailable';
   }
 
+  private loadBooks(filters: BookFilters = this.createRequestFilters()): void {
+    this.loading = true;
+    this.errorMessage = '';
+
+    // A szabványos keresőűrlap a szerveroldali szűrést használja, így a gomb és az Enter ugyanúgy működik.
+    this.bookService.getBooks(filters).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (response) => {
+        this.books = response.items;
+        this.loading = false;
+        this.changeDetectorRef.detectChanges();
+      },
+      error: () => {
+        this.errorMessage = 'Nem sikerült betölteni a könyveket.';
+        this.books = [];
+        this.loading = false;
+        this.changeDetectorRef.detectChanges();
+      },
+    });
+  }
+
   private refreshBooks(resetFilters: boolean): void {
     if (resetFilters) {
-      // Visszanavigáláskor mindig teljes listával, alap szűrőkkel indulunk.
-      this.filters = this.createEmptyFilters();
+      this.resetFiltersForPageEntry();
     }
 
     this.loadBooks();
@@ -169,7 +151,6 @@ export class Books implements OnInit, OnDestroy {
   }
 
   private clearNavigationMessageFromHistory(): void {
-    // A sikerüzenetet csak egyszer szeretnénk megjeleníteni visszanavigálás után.
     const nextState = {
       ...history.state,
       systemMessage: undefined,
@@ -178,21 +159,38 @@ export class Books implements OnInit, OnDestroy {
     history.replaceState(nextState, document.title, window.location.href);
   }
 
-  private createFilterSnapshot(): BookFilters {
-    return {
-      title: this.filters.title?.trim() ?? '',
-      author: this.filters.author?.trim() ?? '',
-      genre: this.filters.genre?.trim() ?? '',
-      available: typeof this.filters.available === 'boolean' ? this.filters.available : '',
+  private createRequestFilters(): BookFilters {
+    const { title, author, genre, available } = this.filterForm.getRawValue();
+    const requestFilters: BookFilters = {
+      page: 1,
+      pageSize: 50,
     };
+
+    if (title.trim()) {
+      requestFilters.title = title.trim();
+    }
+
+    if (author.trim()) {
+      requestFilters.author = author.trim();
+    }
+
+    if (genre.trim()) {
+      requestFilters.genre = genre.trim();
+    }
+
+    if (typeof available === 'boolean') {
+      requestFilters.available = available;
+    }
+
+    return requestFilters;
   }
 
-  private createEmptyFilters(): BookFilters {
-    return {
+  private resetFiltersForPageEntry(): void {
+    this.filterForm.reset({
       title: '',
       author: '',
       genre: '',
-      available: '',
-    };
+      available: null,
+    });
   }
 }

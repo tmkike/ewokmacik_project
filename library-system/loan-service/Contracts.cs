@@ -23,16 +23,16 @@ sealed record ValidatedLoanCreatePayload(
     string BookId,
     string BorrowerName,
     string BorrowerEmail,
-    DateTime DueAt,
+    DateOnly DueDate,
     string? Notes);
 
 sealed record ValidatedLoanUpdatePayload(
     string BorrowerName,
     string BorrowerEmail,
-    DateTime DueAt,
+    DateOnly DueDate,
     string? Notes);
 
-sealed record ValidatedLoanReturnPayload(DateTime ReturnedAt);
+sealed record ValidatedLoanReturnPayload(DateOnly ReturnedDate);
 
 sealed record BookInventoryResponse(
     [property: JsonPropertyName("_id")] string Id,

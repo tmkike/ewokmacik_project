@@ -5,16 +5,25 @@ static class LoanApi
 {
     public static void Map(WebApplication app)
     {
-        var loans = app.MapGroup("/api/loans");
-        loans.MapGet("/", GetLoansAsync);
-        loans.MapGet("/active", GetActiveLoansAsync);
-        loans.MapPost("/", CreateLoanAsync);
-        loans.MapPut("/{id}", UpdateLoanAsync);
-        loans.MapPut("/{id}/return", ReturnLoanAsync);
+        var loans = app.MapGroup("/api/loans")
+            .WithTags("Loans");
+
+        loans.MapGet("/", GetLoansAsync)
+            .WithName("GetLoans");
+        loans.MapGet("/active", GetActiveLoansAsync)
+            .WithName("GetActiveLoans");
+        loans.MapPost("/", CreateLoanAsync)
+            .WithName("CreateLoan");
+        loans.MapPut("/{id}", UpdateLoanAsync)
+            .WithName("UpdateLoan");
+        loans.MapPut("/{id}/return", ReturnLoanAsync)
+            .WithName("ReturnLoan");
 
         var internalLoans = app.MapGroup("/internal/loans");
-        internalLoans.MapGet("/active-book-ids", GetActiveLoanBookIdsAsync);
-        internalLoans.MapGet("/books/{bookId}/active", GetActiveLoanForBookAsync);
+        internalLoans.MapGet("/active-book-ids", GetActiveLoanBookIdsAsync)
+            .ExcludeFromDescription();
+        internalLoans.MapGet("/books/{bookId}/active", GetActiveLoanForBookAsync)
+            .ExcludeFromDescription();
     }
 
     private static async Task<IResult> GetLoansAsync(MongoDbContext db, CancellationToken cancellationToken)
@@ -103,7 +112,11 @@ static class LoanApi
         }
     }
 
-    private static async Task<IResult> UpdateLoanAsync(string id, LoanUpdateRequest? request, MongoDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> UpdateLoanAsync(
+        string id,
+        LoanUpdateRequest? request,
+        MongoDbContext db,
+        CancellationToken cancellationToken)
     {
         if (!ObjectId.TryParse(id, out var loanId))
         {
@@ -133,9 +146,9 @@ static class LoanApi
 
         var payload = validationResult.Payload!;
 
-        if (payload.DueAt < existingLoan.LoanedAt)
+        if (LoanDateRules.IsBeforeLoanedAt(payload.DueDate, existingLoan.LoanedAt))
         {
-            return Results.BadRequest(new ErrorResponse("A határidő nem lehet korábbi, mint a kölcsönzés dátuma."));
+            return Results.BadRequest(new ErrorResponse("A határidő nem lehet korábbi, mint a kölcsönzés napja."));
         }
 
         var updatedLoan = await db.Loans.FindOneAndUpdateAsync(
@@ -146,7 +159,7 @@ static class LoanApi
                 .Set(loan => loan.BorrowerName, payload.BorrowerName)
                 .Set(loan => loan.BorrowerEmail, payload.BorrowerEmail)
                 .Set(loan => loan.Notes, payload.Notes)
-                .Set(loan => loan.DueAt, payload.DueAt)
+                .Set(loan => loan.DueAt, LoanDateRules.ToUtcDateTime(payload.DueDate))
                 .Set(loan => loan.UpdatedAt, DateTime.UtcNow),
             new FindOneAndUpdateOptions<LoanDocument> { ReturnDocument = ReturnDocument.After },
             cancellationToken);
@@ -191,9 +204,9 @@ static class LoanApi
 
         var payload = validationResult.Payload!;
 
-        if (payload.ReturnedAt < existingLoan.LoanedAt)
+        if (LoanDateRules.IsBeforeLoanedAt(payload.ReturnedDate, existingLoan.LoanedAt))
         {
-            return Results.BadRequest(new ErrorResponse("A visszahozás dátuma nem lehet korábbi, mint a kölcsönzés időpontja."));
+            return Results.BadRequest(new ErrorResponse("A visszahozás dátuma nem lehet korábbi, mint a kölcsönzés napja."));
         }
 
         var updatedLoan = await db.Loans.FindOneAndUpdateAsync(
@@ -201,7 +214,7 @@ static class LoanApi
                 Builders<LoanDocument>.Filter.Eq(loan => loan.Id, loanId),
                 Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active")),
             Builders<LoanDocument>.Update
-                .Set(loan => loan.ReturnedAt, payload.ReturnedAt)
+                .Set(loan => loan.ReturnedAt, LoanDateRules.ToUtcDateTime(payload.ReturnedDate))
                 .Set(loan => loan.Status, "returned")
                 .Set(loan => loan.UpdatedAt, DateTime.UtcNow),
             new FindOneAndUpdateOptions<LoanDocument> { ReturnDocument = ReturnDocument.After },
