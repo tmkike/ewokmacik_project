@@ -3,17 +3,19 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-import { Books } from './books';
 import { BookService } from '../../services/book.service';
+import { Books } from './books';
 
 describe('Books', () => {
   let component: Books;
   let fixture: ComponentFixture<Books>;
   const bookServiceMock = {
-    getBooks: () => of([]),
+    getBooks: vi.fn(() => of([])),
   };
 
   beforeEach(async () => {
+    bookServiceMock.getBooks.mockClear();
+
     await TestBed.configureTestingModule({
       imports: [Books],
       providers: [
@@ -31,7 +33,26 @@ describe('Books', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should clear the success message after 3 seconds', () => {
+  it('should request filtered books from the backend', () => {
+    bookServiceMock.getBooks.mockClear();
+    component.filters = {
+      title: 'Dune',
+      author: 'Frank Herbert',
+      genre: 'Science Fiction',
+      available: true,
+    };
+
+    component.applyFilters();
+
+    expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
+      title: 'Dune',
+      author: 'Frank Herbert',
+      genre: 'Science Fiction',
+      available: true,
+    });
+  });
+
+  it('should clear the success message after 1.5 seconds', () => {
     vi.useFakeTimers();
     component.successMessage = 'Sikeres művelet';
     component.successMessageVisible = true;
@@ -61,7 +82,7 @@ describe('Books', () => {
       genre: 'Science Fiction',
       available: false,
       hasActiveLoan: true,
-    })).toBe('Kikolcsonozve');
+    })).toBe('Kikölcsönözve');
   });
 
   it('should keep regular unavailable books distinct from borrowed ones', () => {
@@ -73,6 +94,6 @@ describe('Books', () => {
       genre: 'Science Fiction',
       available: false,
       hasActiveLoan: false,
-    })).toBe('Nem elerheto');
+    })).toBe('Nem elérhető');
   });
 });

@@ -9,6 +9,7 @@ import { Book } from '../../models/book';
 import { Loan, LoanCreatePayload } from '../../models/loan';
 import { BookService } from '../../services/book.service';
 import { LoanService } from '../../services/loan.service';
+import { BOOK_AVAILABILITY_LABELS } from '../../shared/book-availability';
 
 type LoanFormModel = {
   borrowerName: string;
@@ -28,6 +29,7 @@ export class BookDetail implements OnInit {
   bookId = '';
   activeLoan?: Loan;
   hasActiveLoanConflict = false;
+  bookLoadFailed = false;
   private activeLoanRequestId = 0;
   private activeLoanRequestBookId = '';
   loading = false;
@@ -57,6 +59,8 @@ export class BookDetail implements OnInit {
       const id = params.get('id');
 
       if (!id) {
+        this.clearLoadedBookState();
+        this.bookLoadFailed = true;
         this.errorMessage = 'Hiányzó könyvazonosító.';
         this.loading = false;
         this.cancelActiveLoanLookup();
@@ -98,14 +102,14 @@ export class BookDetail implements OnInit {
 
   get bookStatusLabel(): string {
     if (this.activeLoan || this.book?.hasActiveLoan || this.hasActiveLoanConflict) {
-      return 'Kikolcsonozve';
+      return BOOK_AVAILABILITY_LABELS.loaned;
     }
 
     if (this.book?.available) {
-      return 'Elerheto';
+      return BOOK_AVAILABILITY_LABELS.available;
     }
 
-    return 'Nem elerheto';
+    return BOOK_AVAILABILITY_LABELS.unavailable;
   }
 
   get isAvailabilityToggleDisabled(): boolean {
@@ -118,6 +122,7 @@ export class BookDetail implements OnInit {
 
   loadBook(id: string): void {
     this.loading = !this.book;
+    this.bookLoadFailed = false;
     this.errorMessage = '';
     this.loanErrorMessage = '';
 
@@ -128,28 +133,15 @@ export class BookDetail implements OnInit {
     ).subscribe({
       next: (book) => {
         this.book = book;
+        this.bookLoadFailed = false;
         this.syncLoanState(book);
       },
-      error: () => {
+      error: (error: HttpErrorResponse) => {
         this.cancelActiveLoanLookup();
-        this.errorMessage = `Nem sikerült betölteni a könyvet. Azonosító: ${id}`;
-
-        if (this.book?._id === id) {
-          if (this.book.activeLoan) {
-            this.applyLoadedActiveLoan(this.book.activeLoan);
-            return;
-          }
-
-          if (this.book.available === false) {
-            this.activeLoan = undefined;
-            this.hasActiveLoanConflict = false;
-            this.loadActiveLoan(id);
-            return;
-          }
-        }
-
-        this.activeLoan = undefined;
-        this.hasActiveLoanConflict = false;
+        // Betöltési hiba után ne maradjon szerkeszthető, régi állapot a képernyőn.
+        this.clearLoadedBookState();
+        this.bookLoadFailed = true;
+        this.errorMessage = this.extractErrorMessage(error, `Nem sikerült betölteni a könyvet. Azonosító: ${id}`);
       },
     });
   }
@@ -447,6 +439,13 @@ export class BookDetail implements OnInit {
     };
   }
 
+  private clearLoadedBookState(): void {
+    this.book = undefined;
+    this.activeLoan = undefined;
+    this.hasActiveLoanConflict = false;
+    this.loanForm = this.createEmptyLoanForm();
+  }
+
   private applyLoadedActiveLoan(loan: Loan): void {
     this.activeLoan = loan;
     this.hasActiveLoanConflict = false;
@@ -535,11 +534,11 @@ export class BookDetail implements OnInit {
     }
 
     if (!borrowerEmail) {
-      return 'Add meg a kölcsönző e-mail címét.';
+      return 'Add meg a kölcsönző e-mail-címét.';
     }
 
     if (!this.isValidEmail(borrowerEmail)) {
-      return 'Adj meg érvényes e-mail címet.';
+      return 'Adj meg érvényes e-mail-címet.';
     }
 
     if (!dueAt) {

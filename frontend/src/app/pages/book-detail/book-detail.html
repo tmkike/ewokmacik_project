@@ -34,7 +34,7 @@
       <strong>Sikertelen művelet:</strong> {{ errorMessage }}
     </div>
 
-    <form *ngIf="book" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
+    <form *ngIf="book && !bookLoadFailed" class="edit-form" (ngSubmit)="saveBook()" #editForm="ngForm">
       <h1>{{ book.title }}</h1>
       <p class="book-status">{{ bookStatusLabel }}</p>
 
@@ -84,7 +84,7 @@
       Kikölcsönzött könyv nem törölhető.
     </p>
 
-    <section class="loan-panel" *ngIf="book">
+    <section class="loan-panel" *ngIf="book && !bookLoadFailed">
       <h2>Kölcsönzéskezelés</h2>
 
       <div class="loan-termination-action" *ngIf="showLoanTerminationButton">
@@ -105,29 +105,29 @@
       </p>
 
       <p class="status" *ngIf="!loanLoading && !activeLoan && book.available">
-        A konyv jelenleg elerheto. Uj kolcsonzes indithato.
+        A könyv jelenleg elérhető. Új kölcsönzés indítható.
       </p>
 
       <div class="loan-summary" *ngIf="activeLoan">
         <label class="loan-readonly-field">
-          <span class="label-text">Kolcsonzo neve</span>
+          <span class="label-text">Kölcsönző neve</span>
           <span class="loan-readonly-value">{{ activeLoan.borrowerName }}</span>
         </label>
 
         <label class="loan-readonly-field">
-          <span class="label-text">Kolcsonzo e-mail cime</span>
+          <span class="label-text">Kölcsönző e-mail-címe</span>
           <span class="loan-readonly-value">{{ activeLoan.borrowerEmail || 'Nincs megadva' }}</span>
         </label>
 
         <label class="loan-readonly-field">
-          <span class="label-text">Hatarido</span>
+          <span class="label-text">Határidő</span>
           <span class="loan-readonly-value">{{ formatLoanDateLabel(activeLoan.dueAt) }}</span>
         </label>
 
         <label class="loan-readonly-field">
-          <span class="label-text">Megjegyzes</span>
+          <span class="label-text">Megjegyzés</span>
           <span class="loan-readonly-value loan-readonly-value--multiline">
-            {{ activeLoan.notes || 'Nincs megjegyzes' }}
+            {{ activeLoan.notes || 'Nincs megjegyzés' }}
           </span>
         </label>
       </div>
@@ -151,7 +151,7 @@
         </label>
 
         <label>
-          <span class="label-text">Kölcsönző e-mail címe <span class="required-marker">*</span></span>
+          <span class="label-text">Kölcsönző e-mail-címe <span class="required-marker">*</span></span>
           <input
             type="email"
             name="borrowerEmail"
@@ -198,7 +198,7 @@
       </form>
 
       <p class="status" *ngIf="!loanLoading && !activeLoan && !book.available && book.hasActiveLoan">
-        A konyv jelenleg kikolcsonozve, de a reszletek most nem erhetoek el.
+        A könyv jelenleg kikölcsönözve, de a részletek most nem érhetők el.
       </p>
 
       <p class="status" *ngIf="!loanLoading && !activeLoan && !book.available && !book.hasActiveLoan">

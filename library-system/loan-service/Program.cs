@@ -27,9 +27,13 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddHttpClient<BookServiceClient>(client =>
 {
+    // A loan-service ezen a belső címen kérdezi le vagy módosítja a könyvek állapotát.
     var bookServiceUrl = builder.Configuration["BOOK_SERVICE_URL"] ?? "http://localhost:3001";
     client.BaseAddress = new Uri($"{bookServiceUrl.TrimEnd('/')}/");
+    client.Timeout = TimeSpan.FromSeconds(5);
 });
+builder.Services.AddSingleton<BookReleaseSyncService>();
+builder.Services.AddHostedService<BookReleaseRetryBackgroundService>();
 
 builder.Services.AddSingleton(sp =>
 {
@@ -41,6 +45,7 @@ builder.Services.AddSingleton(sp =>
         ?? configuration["MongoDb:DatabaseName"]
         ?? "library";
 
+    // A Mongo kapcsolatot egyszer hozzuk létre, és ugyanazt az adatbázis-példányt használjuk minden kérésnél.
     return new MongoDbContext(new MongoClient(connectionString).GetDatabase(databaseName));
 });
 
@@ -62,13 +67,15 @@ app.UseExceptionHandler(errorApp =>
 
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new ErrorResponse("Belso szerverhiba tortent."));
+        await context.Response.WriteAsJsonAsync(new ErrorResponse("Belső szerverhiba történt."));
     });
 });
 
 app.UseCors();
+// Az indexek induláskor készülnek el, így futás közben már nem kell ezzel foglalkozni.
 await app.Services.GetRequiredService<MongoDbContext>().EnsureIndexesAsync();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "loan-service" }));
+// A kölcsönzési végpontok külön modulban maradnak, hogy a Program.cs rövid és áttekinthető legyen.
 LoanApi.Map(app);
 
 await app.RunAsync();

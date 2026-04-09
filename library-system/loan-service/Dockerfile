@@ -10,6 +10,10 @@ RUN dotnet publish "./LibrarySystem.LoanService.csproj" -c Release -o /app/publi
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV ASPNETCORE_URLS=http://+:3002
 
 EXPOSE 3002

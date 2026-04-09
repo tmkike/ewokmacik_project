@@ -10,6 +10,10 @@ RUN dotnet publish "./LibrarySystem.BookService.csproj" -c Release -o /app/publi
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV ASPNETCORE_URLS=http://+:3001
 
 EXPOSE 3001

@@ -1,31 +1,48 @@
 services:
-
   frontend:
     build:
       context: ../frontend
     container_name: library-frontend
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
     ports:
       - "4200:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   api-gateway:
     image: nginx:1.27-alpine
     container_name: library-api-gateway
     depends_on:
-      - book-service
-      - loan-service
+      book-service:
+        condition: service_healthy
+      loan-service:
+        condition: service_healthy
     ports:
       - "3000:3000"
+    restart: unless-stopped
     volumes:
       - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   book-service:
     build:
       context: ./book-service
     container_name: library-book-service
     depends_on:
-      - book-mongodb
+      book-mongodb:
+        condition: service_healthy
     environment:
       PORT: 3001
       MONGODB_URI: mongodb://book-mongodb:27017
@@ -33,13 +50,21 @@ services:
       LOAN_SERVICE_URL: http://loan-service:3002
     ports:
       - "3001:3001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   loan-service:
     build:
       context: ./loan-service
     container_name: library-loan-service
     depends_on:
-      - loan-mongodb
+      loan-mongodb:
+        condition: service_healthy
     environment:
       PORT: 3002
       MONGODB_URI: mongodb://loan-mongodb:27017
@@ -47,23 +72,44 @@ services:
       BOOK_SERVICE_URL: http://book-service:3001
     ports:
       - "3002:3002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:3002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   book-mongodb:
     image: mongo:8
     container_name: library-book-mongodb
     ports:
       - "27018:27017"
+    restart: unless-stopped
     volumes:
       - ./database/book-seed:/docker-entrypoint-initdb.d
       - book-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"quit(db.adminCommand({ ping: 1 }).ok ? 0 : 2)\" localhost:27017/admin"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
 
   loan-mongodb:
     image: mongo:8
     container_name: library-loan-mongodb
     ports:
       - "27019:27017"
+    restart: unless-stopped
     volumes:
       - loan-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"quit(db.adminCommand({ ping: 1 }).ok ? 0 : 2)\" localhost:27017/admin"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
 
 volumes:
   book-mongodb-data:

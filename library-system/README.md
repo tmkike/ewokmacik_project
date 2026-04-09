@@ -1,58 +1,45 @@
 # Library System
 
-Ez a mappa most mar teljesebben leválasztott mikroszervizes felallasban tartalmazza a konyvtari rendszert:
+Ez a mappa a könyvtári rendszer jelenlegi, mikroszervizes változatát tartalmazza.
 
-- `book-service`: a konyvek CRUD es listazo API-ja
-- `loan-service`: a kolcsonzesek kezelese
-- `api-gateway`: a frontend egyetlen belepesi pontja
-- `book-mongodb`: a konyvek sajat adatbazis-szolgaltatasa
-- `loan-mongodb`: a kolcsonzesek sajat adatbazis-szolgaltatasa
+## Felépítés
 
-## Kovetelmenyek
+- `book-service`: a könyvek listázása, létrehozása, módosítása és törlése
+- `loan-service`: a kölcsönzések kezelése
+- `api-gateway`: egységes belépési pont a frontend számára
+- `book-mongodb`: a könyvek adatbázisa
+- `loan-mongodb`: a kölcsönzések adatbázisa
+- `database/book-seed`: a kezdeti könyvlista seed adatai
+- `k8s`: Kubernetes manifestek
 
-Helyi futtatashoz ezek kellenek:
+## Követelmények
+
+Helyi futtatáshoz ezek szükségesek:
 
 - Docker Desktop
 - Docker Compose
 - .NET 8 SDK
 
-## Architektura
-
-A frontend tovabbra is a `http://localhost:3000/api/...` vegpontokat hivja, de a hatter mar kulon adat-es szolgaltatas-hatarokkal fut:
+## Architektúra
 
 ```text
 frontend -> api-gateway -> book-service -> book-mongodb
 frontend -> api-gateway -> loan-service -> loan-mongodb
 
-book-service <-> loan-service   # HTTP service-to-service kommunikacio
-loan-service <-> book-service   # book reserve / release folyamatokhoz
+book-service <-> loan-service
 ```
 
-A fo valtozas, hogy:
+Fontos, hogy a két szolgáltatás már nem olvas közvetlenül egymás adatbázisából. Az állapotok egyeztetése belső HTTP-hívásokkal történik.
 
-- a `book-service` mar nem olvas a kolcsonzes adatbazisabol
-- a `loan-service` mar nem olvas a konyvek adatbazisabol
-- a ket service egymas allapotat belso HTTP hivassal kerdezi le vagy modositja
-- mindket service sajat MongoDB szolgaltatast kapott
+## Indítás Dockerrel
 
-## Inditas Dockerrel
-
-Nyiss terminalt a `library-system` mappaban, majd futtasd:
+Nyiss terminált a `library-system` mappában, majd futtasd:
 
 ```bash
-docker compose up -d --build --remove-orphans
+docker compose up -d --build --force-recreate
 ```
 
-Ezzel elindul:
-
-- a frontend Angular alkalmazas a `4200` porton
-- az API gateway a `3000` porton
-- a `book-service` a `3001` porton
-- a `loan-service` a `3002` porton
-- a `book-mongodb` a `27018` porton
-- a `loan-mongodb` a `27019` porton
-
-Hasznos cimek:
+Hasznos címek:
 
 ```text
 http://localhost:4200
@@ -61,9 +48,25 @@ http://localhost:3001/health
 http://localhost:3002/health
 ```
 
-## Helyi fejlesztoi futtatas
+Portkiosztás:
 
-Ha nem Dockerbol szeretned inditani a service-eket, kulon-kulon futtasd oket:
+- `4200`: frontend
+- `3000`: API gateway
+- `3001`: book-service
+- `3002`: loan-service
+- `27018`: book-mongodb
+- `27019`: loan-mongodb
+
+Teljesen tiszta újraindításhoz:
+
+```bash
+docker compose down -v --remove-orphans
+docker compose up -d --build --force-recreate
+```
+
+## Helyi fejlesztői futtatás
+
+Ha a backend szolgáltatásokat Docker nélkül szeretnéd indítani, futtasd őket külön:
 
 ```bash
 cd book-service
@@ -77,7 +80,7 @@ dotnet restore
 dotnet run
 ```
 
-Alapertelmezett kornyezeti valtozok:
+Alapértelmezett környezeti változók a `book-service` számára:
 
 ```text
 PORT=3001
@@ -85,6 +88,8 @@ MONGODB_URI=mongodb://localhost:27018
 MONGODB_DB=books
 LOAN_SERVICE_URL=http://localhost:3002
 ```
+
+Alapértelmezett környezeti változók a `loan-service` számára:
 
 ```text
 PORT=3002
@@ -95,7 +100,7 @@ BOOK_SERVICE_URL=http://localhost:3001
 
 ## REST API
 
-A gateway mogott ugyanazok a publikus vegpontok maradtak:
+A publikus végpontok az API gateway mögött érhetők el:
 
 ```text
 GET    /api/books
@@ -112,45 +117,36 @@ PUT    /api/loans/:id
 PUT    /api/loans/:id/return
 ```
 
-A belso service-to-service vegpontok nem a gatewayen mennek at, hanem a Docker halozaton keresztul futnak.
+## Integrációs tesztek
+
+A `tests/LibrarySystem.StackTests` projekt a futó gatewayn keresztül ellenőrzi a fő üzleti folyamatokat.
+
+Példa futtatás:
+
+```bash
+dotnet test tests/LibrarySystem.StackTests/LibrarySystem.StackTests.csproj
+```
 
 ## Seed adatok
 
-A konyvek kezdoadatai a `database/book-seed` mappabol toltodnek be a `book-mongodb` szolgaltatasba.
+A könyvek kezdeti adatai a `database/book-seed` mappából töltődnek be a `book-mongodb` konténer indulásakor.
 
-A `loan-service` kulon ures adatbazissal indul, es a kolcsonzeseket mar csak a sajat `loan-mongodb` adatbazisaban tarolja.
+A `loan-service` külön, üres adatbázissal indul. A kölcsönzési adatok kizárólag a `loan-mongodb` adatbázisban tárolódnak.
 
 ## Kubernetes
 
-A `k8s` mappa most mar a teljes jelenlegi architekturahoz tartalmaz manifesteket:
+A `k8s` mappa a teljes jelenlegi architektúrához tartalmaz manifesteket.
 
-- `frontend`
-- `api-gateway`
-- `book-service`
-- `loan-service`
-- `book-mongodb`
-- `loan-mongodb`
-
-A javasolt telepitesi mod:
-
-```bash
-kubectl apply -k library-system/k8s
-```
-
-Vagy ha mar a `library-system` mappaban vagy:
+Telepítés:
 
 ```bash
 kubectl apply -k k8s
 ```
 
-A `frontend` Kubernetesben is ugyanazon az originen keresztul hivja az API-t, a `/api` utvonalakat az Nginx a clusteren beluli `api-gateway` service fele proxyzza.
-
-Az image-ek, amikre a manifestek mutatnak:
+Az image-ek, amelyekre a manifestek mutatnak:
 
 ```text
 ghcr.io/tmkike/ewokmacik_project-frontend:latest
 ghcr.io/tmkike/ewokmacik_project-book-service:latest
 ghcr.io/tmkike/ewokmacik_project-loan-service:latest
 ```
-
-Ha a GHCR csomagok privatkent vannak beallitva, szukseged lesz egy `imagePullSecret`-re is a clusterben. Az ArgoCD alkalmazas manifest mar a teljes `k8s` konyvtarra mutat, es `CreateNamespace=true` sync optiont is kapott.

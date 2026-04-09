@@ -130,7 +130,7 @@ describe('BookDetail', () => {
       hasActiveLoan: true,
     };
 
-    expect(component.bookStatusLabel).toBe('Kikolcsonozve');
+    expect(component.bookStatusLabel).toBe('Kikölcsönözve');
   });
 
   it('should disable the availability checkbox when an active loan is loaded', () => {
@@ -251,7 +251,7 @@ describe('BookDetail', () => {
     loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
   });
 
-  it('should keep preloaded active loan details when the book detail reload fails', () => {
+  it('should clear preloaded book and loan details when the book detail reload fails', () => {
     component.book = {
       _id: '1',
       title: 'Dune',
@@ -274,17 +274,19 @@ describe('BookDetail', () => {
         status: 'active',
       },
     };
+    component['applyLoadedActiveLoan'](component.book.activeLoan!);
     bookServiceMock.getBook = () => throwError(() => ({
       error: { message: 'Betöltési hiba' },
     }));
 
     component.loadBook('1');
 
-    expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.loanForm.borrowerName).toBe('Teszt Elek');
-    expect(component.loanForm.borrowerEmail).toBe('teszt@example.com');
-    expect(component.loanForm.notes).toBe('Megjegyzés');
-    expect(component.showLoanTerminationButton).toBe(true);
+    expect(component.book).toBeUndefined();
+    expect(component.activeLoan).toBeUndefined();
+    expect(component.bookLoadFailed).toBe(true);
+    expect(component.loanForm.borrowerName).toBe('');
+    expect(component.showLoanTerminationButton).toBe(false);
+    expect(component.errorMessage).toBe('Betöltési hiba');
 
     bookServiceMock.getBook = () => of({
       _id: '1',
@@ -296,19 +298,8 @@ describe('BookDetail', () => {
     });
   });
 
-  it('should recover loan details from active loans when detail reload fails for an unavailable book', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
-    bookServiceMock.getBook = () => throwError(() => ({
-      error: { message: 'Betöltési hiba' },
-    }));
-    loanServiceMock.getActiveLoanForBook = () => of({
+  it('should not perform active loan lookup from stale data when the detail reload fails', () => {
+    const getActiveLoanForBookSpy = vi.fn(() => of({
       _id: 'loan-1',
       bookId: '1',
       bookTitle: 'Dune',
@@ -320,15 +311,27 @@ describe('BookDetail', () => {
       dueAt: '2026-04-15T10:00:00.000Z',
       returnedAt: null,
       status: 'active' as const,
-    });
+    }));
+
+    component.book = {
+      _id: '1',
+      title: 'Dune',
+      author: 'Frank Herbert',
+      year: 1965,
+      genre: 'Science Fiction',
+      available: false,
+    };
+    bookServiceMock.getBook = () => throwError(() => ({
+      error: { message: 'Betöltési hiba' },
+    }));
+    loanServiceMock.getActiveLoanForBook = getActiveLoanForBookSpy;
 
     component.loadBook('1');
 
-    expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.loanForm.borrowerName).toBe('Teszt Elek');
-    expect(component.loanForm.borrowerEmail).toBe('teszt@example.com');
-    expect(component.loanForm.notes).toBe('Megjegyzés');
-    expect(component.showLoanTerminationButton).toBe(true);
+    expect(getActiveLoanForBookSpy).not.toHaveBeenCalled();
+    expect(component.book).toBeUndefined();
+    expect(component.activeLoan).toBeUndefined();
+    expect(component.bookLoadFailed).toBe(true);
 
     bookServiceMock.getBook = () => of({
       _id: '1',

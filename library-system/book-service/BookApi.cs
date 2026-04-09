@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -26,7 +24,7 @@ static class BookApi
         LoanServiceClient loanServiceClient,
         CancellationToken cancellationToken)
     {
-        var filterResult = BuildBooksFilter(request.Query);
+        var filterResult = BookValidation.BuildBooksFilter(request.Query);
 
         if (filterResult.ErrorMessage is not null)
         {
@@ -35,11 +33,13 @@ static class BookApi
 
         var books = await db.Books
             .Find(filterResult.Filter)
-            .Sort(Builders<BsonDocument>.Sort.Ascending("title"))
+            .Sort(Builders<BookDocument>.Sort.Ascending(book => book.Title))
             .ToListAsync(cancellationToken);
 
         var activeLoanBookIds = await loanServiceClient.GetActiveLoanBookIdsAsync(cancellationToken);
-        return Results.Ok(books.Select(book => MapBookResponse(book, activeLoanBookIds.Contains(GetId(book)))));
+        return Results.Ok(books.Select(book => BookDocumentMapper.MapBookResponse(
+            book,
+            activeLoanBookIds.Contains(BookDocumentMapper.GetId(book)))));
     }
 
     private static async Task<IResult> GetBookByIdAsync(
@@ -50,44 +50,44 @@ static class BookApi
     {
         if (!ObjectId.TryParse(id, out var bookId))
         {
-            return Results.BadRequest(new ErrorResponse("Ervenytelen konyvazonosito."));
+            return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
         var book = await db.Books
-            .Find(Builders<BsonDocument>.Filter.Eq("_id", bookId))
+            .Find(Builders<BookDocument>.Filter.Eq(item => item.Id, bookId))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (book is null)
         {
-            return Results.NotFound(new ErrorResponse("A konyv nem talalhato."));
+            return Results.NotFound(new ErrorResponse("A könyv nem található."));
         }
 
         var activeLoan = await loanServiceClient.GetActiveLoanForBookAsync(id, cancellationToken);
-        return Results.Ok(MapBookDetailResponse(book, activeLoan));
+        return Results.Ok(BookDocumentMapper.MapBookDetailResponse(book, activeLoan));
     }
 
     private static async Task<IResult> CreateBookAsync(BookUpsertRequest? request, MongoDbContext db, CancellationToken cancellationToken)
     {
-        var validationResult = ValidateBookPayload(request);
+        var validationResult = BookValidation.ValidateBookPayload(request);
 
         if (validationResult.Errors.Length > 0)
         {
-            return Results.BadRequest(new ValidationErrorResponse("Ervenytelen konyvadatok.", validationResult.Errors));
+            return Results.BadRequest(new ValidationErrorResponse("Érvénytelen könyvadatok.", validationResult.Errors));
         }
 
         var payload = validationResult.Payload!;
-        var bookDocument = new BsonDocument
+        var bookDocument = new BookDocument
         {
-            ["_id"] = ObjectId.GenerateNewId(),
-            ["title"] = payload.Title,
-            ["author"] = payload.Author,
-            ["year"] = payload.Year,
-            ["genre"] = payload.Genre,
-            ["available"] = payload.Available,
+            Id = ObjectId.GenerateNewId(),
+            Title = payload.Title,
+            Author = payload.Author,
+            Year = payload.Year,
+            Genre = payload.Genre,
+            Available = payload.Available,
         };
 
         await db.Books.InsertOneAsync(bookDocument, cancellationToken: cancellationToken);
-        return Results.Json(MapBookResponse(bookDocument), statusCode: StatusCodes.Status201Created);
+        return Results.Json(BookDocumentMapper.MapBookResponse(bookDocument), statusCode: StatusCodes.Status201Created);
     }
 
     private static async Task<IResult> UpdateBookAsync(
@@ -99,37 +99,37 @@ static class BookApi
     {
         if (!ObjectId.TryParse(id, out var bookId))
         {
-            return Results.BadRequest(new ErrorResponse("Ervenytelen konyvazonosito."));
+            return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
-        var validationResult = ValidateBookPayload(request);
+        var validationResult = BookValidation.ValidateBookPayload(request);
 
         if (validationResult.Errors.Length > 0)
         {
-            return Results.BadRequest(new ValidationErrorResponse("Ervenytelen konyvadatok.", validationResult.Errors));
+            return Results.BadRequest(new ValidationErrorResponse("Érvénytelen könyvadatok.", validationResult.Errors));
         }
 
         var payload = validationResult.Payload!;
 
         if (payload.Available && await loanServiceClient.HasActiveLoanAsync(id, cancellationToken))
         {
-            return Results.Conflict(new ErrorResponse("Aktiv kolcsonzes mellett a konyv nem jelolheto elerhetonek."));
+            return Results.Conflict(new ErrorResponse("Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek."));
         }
 
         var updatedBook = await db.Books.FindOneAndUpdateAsync(
-            Builders<BsonDocument>.Filter.Eq("_id", bookId),
-            Builders<BsonDocument>.Update
-                .Set("title", payload.Title)
-                .Set("author", payload.Author)
-                .Set("year", payload.Year)
-                .Set("genre", payload.Genre)
-                .Set("available", payload.Available),
-            new FindOneAndUpdateOptions<BsonDocument> { ReturnDocument = ReturnDocument.After },
+            Builders<BookDocument>.Filter.Eq(book => book.Id, bookId),
+            Builders<BookDocument>.Update
+                .Set(book => book.Title, payload.Title)
+                .Set(book => book.Author, payload.Author)
+                .Set(book => book.Year, payload.Year)
+                .Set(book => book.Genre, payload.Genre)
+                .Set(book => book.Available, payload.Available),
+            new FindOneAndUpdateOptions<BookDocument> { ReturnDocument = ReturnDocument.After },
             cancellationToken);
 
         return updatedBook is null
-            ? Results.NotFound(new ErrorResponse("A konyv nem talalhato."))
-            : Results.Ok(MapBookResponse(updatedBook));
+            ? Results.NotFound(new ErrorResponse("A könyv nem található."))
+            : Results.Ok(BookDocumentMapper.MapBookResponse(updatedBook));
     }
 
     private static async Task<IResult> UpdateBookAvailabilityAsync(
@@ -141,30 +141,30 @@ static class BookApi
     {
         if (!ObjectId.TryParse(id, out var bookId))
         {
-            return Results.BadRequest(new ErrorResponse("Ervenytelen konyvazonosito."));
+            return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
         if (request?.Available is null)
         {
             return Results.BadRequest(new ValidationErrorResponse(
-                "Ervenytelen elerhetosegi adat.",
-                ["Az available mezo kotelezo, es logikai erteknek kell lennie."]));
+                "Érvénytelen elérhetőségi adat.",
+                ["Az available mező kötelező, és logikai értéknek kell lennie."]));
         }
 
         if (request.Available.Value && await loanServiceClient.HasActiveLoanAsync(id, cancellationToken))
         {
-            return Results.Conflict(new ErrorResponse("Aktiv kolcsonzes mellett a konyv nem jelolheto elerhetonek."));
+            return Results.Conflict(new ErrorResponse("Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek."));
         }
 
         var updatedBook = await db.Books.FindOneAndUpdateAsync(
-            Builders<BsonDocument>.Filter.Eq("_id", bookId),
-            Builders<BsonDocument>.Update.Set("available", request.Available.Value),
-            new FindOneAndUpdateOptions<BsonDocument> { ReturnDocument = ReturnDocument.After },
+            Builders<BookDocument>.Filter.Eq(book => book.Id, bookId),
+            Builders<BookDocument>.Update.Set(book => book.Available, request.Available.Value),
+            new FindOneAndUpdateOptions<BookDocument> { ReturnDocument = ReturnDocument.After },
             cancellationToken);
 
         return updatedBook is null
-            ? Results.NotFound(new ErrorResponse("A konyv nem talalhato."))
-            : Results.Ok(MapBookResponse(updatedBook));
+            ? Results.NotFound(new ErrorResponse("A könyv nem található."))
+            : Results.Ok(BookDocumentMapper.MapBookResponse(updatedBook));
     }
 
     private static async Task<IResult> DeleteBookAsync(
@@ -175,20 +175,20 @@ static class BookApi
     {
         if (!ObjectId.TryParse(id, out var bookId))
         {
-            return Results.BadRequest(new ErrorResponse("Ervenytelen konyvazonosito."));
+            return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
         if (await loanServiceClient.HasActiveLoanAsync(id, cancellationToken))
         {
-            return Results.Conflict(new ErrorResponse("Aktiv kolcsonzes alatt allo konyv nem torolheto."));
+            return Results.Conflict(new ErrorResponse("Aktív kölcsönzés alatt álló könyv nem törölhető."));
         }
 
         var result = await db.Books.DeleteOneAsync(
-            Builders<BsonDocument>.Filter.Eq("_id", bookId),
+            Builders<BookDocument>.Filter.Eq(book => book.Id, bookId),
             cancellationToken);
 
         return result.DeletedCount == 0
-            ? Results.NotFound(new ErrorResponse("A konyv nem talalhato."))
+            ? Results.NotFound(new ErrorResponse("A könyv nem található."))
             : Results.NoContent();
     }
 
@@ -196,210 +196,44 @@ static class BookApi
     {
         if (!ObjectId.TryParse(id, out var bookId))
         {
-            return Results.BadRequest(new ErrorResponse("Ervenytelen konyvazonosito."));
+            return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
         var reservedBook = await db.Books.FindOneAndUpdateAsync(
-            Builders<BsonDocument>.Filter.And(
-                Builders<BsonDocument>.Filter.Eq("_id", bookId),
-                Builders<BsonDocument>.Filter.Eq("available", true)),
-            Builders<BsonDocument>.Update.Set("available", false),
-            new FindOneAndUpdateOptions<BsonDocument> { ReturnDocument = ReturnDocument.After },
+            Builders<BookDocument>.Filter.And(
+                Builders<BookDocument>.Filter.Eq(book => book.Id, bookId),
+                Builders<BookDocument>.Filter.Eq(book => book.Available, true)),
+            Builders<BookDocument>.Update.Set(book => book.Available, false),
+            new FindOneAndUpdateOptions<BookDocument> { ReturnDocument = ReturnDocument.After },
             cancellationToken);
 
         if (reservedBook is not null)
         {
-            return Results.Ok(MapBookInventoryResponse(reservedBook));
+            return Results.Ok(BookDocumentMapper.MapBookInventoryResponse(reservedBook));
         }
 
-        var existingBook = await db.Books
-            .Find(Builders<BsonDocument>.Filter.Eq("_id", bookId))
-            .Project(Builders<BsonDocument>.Projection.Include("_id"))
-            .FirstOrDefaultAsync(cancellationToken);
+        var exists = await db.Books.Find(Builders<BookDocument>.Filter.Eq(book => book.Id, bookId)).AnyAsync(cancellationToken);
 
-        return existingBook is null
-            ? Results.NotFound(new ErrorResponse("A konyv nem talalhato."))
-            : Results.Conflict(new ErrorResponse("A konyv jelenleg nem kolcsonozheto, mert mar ki van adva vagy nem elerheto."));
+        return !exists
+            ? Results.NotFound(new ErrorResponse("A könyv nem található."))
+            : Results.Conflict(new ErrorResponse("A könyv jelenleg nem kölcsönözhető, mert már ki van adva vagy nem elérhető."));
     }
 
     private static async Task<IResult> ReleaseBookAsync(string id, MongoDbContext db, CancellationToken cancellationToken)
     {
         if (!ObjectId.TryParse(id, out var bookId))
         {
-            return Results.BadRequest(new ErrorResponse("Ervenytelen konyvazonosito."));
+            return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
         var releasedBook = await db.Books.FindOneAndUpdateAsync(
-            Builders<BsonDocument>.Filter.Eq("_id", bookId),
-            Builders<BsonDocument>.Update.Set("available", true),
-            new FindOneAndUpdateOptions<BsonDocument> { ReturnDocument = ReturnDocument.After },
+            Builders<BookDocument>.Filter.Eq(book => book.Id, bookId),
+            Builders<BookDocument>.Update.Set(book => book.Available, true),
+            new FindOneAndUpdateOptions<BookDocument> { ReturnDocument = ReturnDocument.After },
             cancellationToken);
 
         return releasedBook is null
-            ? Results.NotFound(new ErrorResponse("A konyv nem talalhato."))
-            : Results.Ok(MapBookInventoryResponse(releasedBook));
+            ? Results.NotFound(new ErrorResponse("A könyv nem található."))
+            : Results.Ok(BookDocumentMapper.MapBookInventoryResponse(releasedBook));
     }
-
-    private static BookQueryFilterResult BuildBooksFilter(IQueryCollection query)
-    {
-        var filters = new List<FilterDefinition<BsonDocument>>();
-        var search = query["search"].ToString().Trim();
-        var title = query["title"].ToString().Trim();
-        var author = query["author"].ToString().Trim();
-        var genre = query["genre"].ToString().Trim();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            filters.Add(Builders<BsonDocument>.Filter.Or(
-                Builders<BsonDocument>.Filter.Regex("title", Contains(search)),
-                Builders<BsonDocument>.Filter.Regex("author", Contains(search)),
-                Builders<BsonDocument>.Filter.Regex("genre", Contains(search))));
-        }
-
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            filters.Add(Builders<BsonDocument>.Filter.Regex("title", Contains(title)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(author))
-        {
-            filters.Add(Builders<BsonDocument>.Filter.Regex("author", Contains(author)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(genre))
-        {
-            filters.Add(Builders<BsonDocument>.Filter.Regex("genre", Exact(genre)));
-        }
-
-        var available = query["available"].ToString();
-
-        if (!string.IsNullOrWhiteSpace(available))
-        {
-            if (!bool.TryParse(available, out var availableValue))
-            {
-                return new BookQueryFilterResult(
-                    Builders<BsonDocument>.Filter.Empty,
-                    "Az elerhetoseg szuroje csak true vagy false lehet.");
-            }
-
-            filters.Add(Builders<BsonDocument>.Filter.Eq("available", availableValue));
-        }
-
-        return new BookQueryFilterResult(
-            filters.Count == 0 ? Builders<BsonDocument>.Filter.Empty : Builders<BsonDocument>.Filter.And(filters),
-            null);
-    }
-
-    private static (ValidatedBookPayload? Payload, string[] Errors) ValidateBookPayload(BookUpsertRequest? request)
-    {
-        if (request is null)
-        {
-            return (null, ["A keres torzsenek JSON objektumnak kell lennie."]);
-        }
-
-        var errors = new List<string>();
-        var title = NormalizeRequiredString(request.Title);
-        var author = NormalizeRequiredString(request.Author);
-        var genre = NormalizeRequiredString(request.Genre);
-
-        if (title is null) errors.Add("A cim kotelezo, es nem lehet ures.");
-        if (author is null) errors.Add("A szerzo megadasa kotelezo, es nem lehet ures.");
-        if (request.Year is null || request.Year < 0) errors.Add("A kiadas eve kotelezo, es nemnegativ egesz szamnak kell lennie.");
-        if (genre is null) errors.Add("A kategoria megadasa kotelezo, es nem lehet ures.");
-        if (request.Available is null) errors.Add("Az elerhetoseg megadasa kotelezo, es logikai erteknek kell lennie.");
-
-        return errors.Count > 0
-            ? (null, errors.ToArray())
-            : (new ValidatedBookPayload(title!, author!, request.Year!.Value, genre!, request.Available!.Value), []);
-    }
-
-    private static string? NormalizeRequiredString(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        var normalized = value.Trim();
-        return normalized.Length == 0 ? null : normalized;
-    }
-
-    private static BookResponse MapBookResponse(BsonDocument book, bool hasActiveLoan = false)
-    {
-        return new BookResponse(
-            GetId(book),
-            GetString(book, "title"),
-            GetString(book, "author"),
-            GetInt(book, "year"),
-            GetString(book, "genre"),
-            GetBool(book, "available"),
-            hasActiveLoan);
-    }
-
-    private static BookInventoryResponse MapBookInventoryResponse(BsonDocument book)
-    {
-        return new BookInventoryResponse(
-            GetId(book),
-            GetString(book, "title"),
-            GetString(book, "author"),
-            GetInt(book, "year"),
-            GetString(book, "genre"),
-            GetBool(book, "available"));
-    }
-
-    private static BookDetailResponse MapBookDetailResponse(BsonDocument book, LoanResponse? activeLoan)
-    {
-        return new BookDetailResponse(
-            GetId(book),
-            GetString(book, "title"),
-            GetString(book, "author"),
-            GetInt(book, "year"),
-            GetString(book, "genre"),
-            GetBool(book, "available"),
-            activeLoan is not null,
-            activeLoan);
-    }
-
-    private static string GetId(BsonDocument document) => FlexibleId(document, "_id");
-
-    private static string FlexibleId(BsonDocument document, string fieldName)
-    {
-        if (!document.TryGetValue(fieldName, out var value) || value.IsBsonNull)
-        {
-            return string.Empty;
-        }
-
-        return value.BsonType switch
-        {
-            BsonType.ObjectId => value.AsObjectId.ToString(),
-            BsonType.String => value.AsString,
-            _ => value.ToString() ?? string.Empty,
-        };
-    }
-
-    private static string GetString(BsonDocument document, string fieldName)
-        => document.TryGetValue(fieldName, out var value) && !value.IsBsonNull ? value.ToString() ?? string.Empty : string.Empty;
-
-    private static int GetInt(BsonDocument document, string fieldName)
-    {
-        if (!document.TryGetValue(fieldName, out var value) || value.IsBsonNull)
-        {
-            return 0;
-        }
-
-        return value.BsonType switch
-        {
-            BsonType.Int32 => value.AsInt32,
-            BsonType.Int64 => (int)value.AsInt64,
-            BsonType.Double => (int)value.AsDouble,
-            _ => 0,
-        };
-    }
-
-    private static bool GetBool(BsonDocument document, string fieldName)
-        => document.TryGetValue(fieldName, out var value) && !value.IsBsonNull && value.ToBoolean();
-
-    private static BsonRegularExpression Contains(string value) => new(Regex.Escape(value), "i");
-
-    private static BsonRegularExpression Exact(string value) => new($"^{Regex.Escape(value)}$", "i");
 }

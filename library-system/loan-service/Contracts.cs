@@ -65,3 +65,11 @@ enum BookReservationStatus
 }
 
 sealed record ReserveBookResult(BookReservationStatus Status, BookInventoryResponse? Book);
+
+enum BookReleaseStatus
+{
+    Released,
+    NotFound,
+}
+
+sealed record ReleaseBookResult(BookReleaseStatus Status);

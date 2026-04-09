@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectorRef, Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { finalize, skip, Subscription } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, finalize, skip } from 'rxjs';
 
 import { Book, BookFilters } from '../../models/book';
 import { BookService } from '../../services/book.service';
+import { getBookAvailabilityLabel } from '../../shared/book-availability';
 
 @Component({
   selector: 'app-books',
@@ -14,11 +16,11 @@ import { BookService } from '../../services/book.service';
   styleUrl: './books.scss',
 })
 export class Books implements OnInit, OnDestroy {
-  private booksSubscription?: Subscription;
-  private refreshSubscription?: Subscription;
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly filterChanges = new Subject<BookFilters>();
+  private loadRequestId = 0;
   private successMessageTimeoutId?: ReturnType<typeof setTimeout>;
 
-  allBooks: Book[] = [];
   books: Book[] = [];
   loading = false;
   errorMessage = '';
@@ -35,51 +37,70 @@ export class Books implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.readNavigationMessage();
-    this.refreshBooks(true);
+    this.loadBooks();
 
-    this.refreshSubscription = this.route.queryParamMap.pipe(
+    this.route.queryParamMap.pipe(
       skip(1),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe(() => {
       this.refreshBooks(true);
+    });
+
+    this.filterChanges.pipe(
+      debounceTime(300),
+      distinctUntilChanged((previous, current) => JSON.stringify(previous) === JSON.stringify(current)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((filters) => {
+      this.loadBooks(filters);
     });
   }
 
   ngOnDestroy(): void {
-    this.booksSubscription?.unsubscribe();
-    this.refreshSubscription?.unsubscribe();
     this.clearSuccessMessageTimeout();
   }
 
-  loadBooks(): void {
-    this.booksSubscription?.unsubscribe();
+  loadBooks(filters: BookFilters = this.createFilterSnapshot()): void {
+    const requestId = ++this.loadRequestId;
     this.loading = true;
     this.errorMessage = '';
 
-    // A lista egyszer töltődik be a backenből, utána a mezők kliensoldalon szűrnek.
-    this.booksSubscription = this.bookService.getBooks().pipe(
+    // A szűrés a backendben történik, így nagyobb adatmennyiségnél sem kell mindent letölteni.
+    this.bookService.getBooks(filters).pipe(
       finalize(() => {
-        this.loading = false;
+        if (requestId === this.loadRequestId) {
+          this.loading = false;
+        }
       }),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: (books) => {
-        this.allBooks = books;
-        this.applyFilters();
+        if (requestId !== this.loadRequestId) {
+          return;
+        }
+
+        this.books = books;
       },
       error: () => {
+        if (requestId !== this.loadRequestId) {
+          return;
+        }
+
         this.errorMessage = 'Nem sikerült betölteni a könyveket.';
-        this.allBooks = [];
         this.books = [];
       },
     });
   }
 
+  onFiltersChanged(): void {
+    this.filterChanges.next(this.createFilterSnapshot());
+  }
+
   applyFilters(): void {
-    this.books = this.applyClientSideFilters(this.allBooks);
+    this.loadBooks();
   }
 
   clearFilters(): void {
     this.filters = this.createEmptyFilters();
-    this.applyFilters();
     this.loadBooks();
   }
 
@@ -95,11 +116,7 @@ export class Books implements OnInit, OnDestroy {
   }
 
   getBookAvailabilityLabel(book: Book): string {
-    if (book.hasActiveLoan) {
-      return 'Kikolcsonozve';
-    }
-
-    return book.available ? 'Elerheto' : 'Nem elerheto';
+    return getBookAvailabilityLabel(book);
   }
 
   getBookAvailabilityClass(book: Book): string {
@@ -152,6 +169,7 @@ export class Books implements OnInit, OnDestroy {
   }
 
   private clearNavigationMessageFromHistory(): void {
+    // A sikerüzenetet csak egyszer szeretnénk megjeleníteni visszanavigálás után.
     const nextState = {
       ...history.state,
       systemMessage: undefined,
@@ -160,24 +178,13 @@ export class Books implements OnInit, OnDestroy {
     history.replaceState(nextState, document.title, window.location.href);
   }
 
-  private applyClientSideFilters(books: Book[]): Book[] {
-    return books.filter((book) => {
-      const titleMatches = this.matchesTextFilter(book.title, this.filters.title);
-      const authorMatches = this.matchesTextFilter(book.author, this.filters.author);
-      const genreMatches = this.matchesTextFilter(book.genre, this.filters.genre);
-      const availabilityMatches = typeof this.filters.available !== 'boolean'
-        || book.available === this.filters.available;
-
-      return titleMatches && authorMatches && genreMatches && availabilityMatches;
-    });
-  }
-
-  private matchesTextFilter(value: string, filter?: string): boolean {
-    if (!filter?.trim()) {
-      return true;
-    }
-
-    return value.toLowerCase().includes(filter.trim().toLowerCase());
+  private createFilterSnapshot(): BookFilters {
+    return {
+      title: this.filters.title?.trim() ?? '',
+      author: this.filters.author?.trim() ?? '',
+      genre: this.filters.genre?.trim() ?? '',
+      available: typeof this.filters.available === 'boolean' ? this.filters.available : '',
+    };
   }
 
   private createEmptyFilters(): BookFilters {

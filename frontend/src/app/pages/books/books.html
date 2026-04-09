@@ -17,7 +17,7 @@
           name="title"
           placeholder="Cím"
           [(ngModel)]="filters.title"
-          (ngModelChange)="applyFilters()"
+          (ngModelChange)="onFiltersChanged()"
         />
       </label>
 
@@ -28,7 +28,7 @@
           name="author"
           placeholder="Szerző"
           [(ngModel)]="filters.author"
-          (ngModelChange)="applyFilters()"
+          (ngModelChange)="onFiltersChanged()"
         />
       </label>
 
@@ -39,7 +39,7 @@
           name="genre"
           placeholder="Kategória"
           [(ngModel)]="filters.genre"
-          (ngModelChange)="applyFilters()"
+          (ngModelChange)="onFiltersChanged()"
         />
       </label>
 
@@ -48,7 +48,7 @@
         <select
           name="available"
           [(ngModel)]="filters.available"
-          (ngModelChange)="applyFilters()"
+          (ngModelChange)="onFiltersChanged()"
         >
           <option [ngValue]="''">Mind</option>
           <option [ngValue]="true">Elérhető</option>
@@ -75,7 +75,9 @@
 
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
-    <ul class="book-list" *ngIf="books.length > 0" aria-label="Könyvek">
+    <p class="status" *ngIf="loading">Könyvek betöltése...</p>
+
+    <ul class="book-list" *ngIf="!loading && books.length > 0" aria-label="Könyvek">
       <li *ngFor="let book of books">
         <button type="button" class="book-list-item" (click)="openBook(book)">
           <span class="book-title">{{ book.title }}</span>

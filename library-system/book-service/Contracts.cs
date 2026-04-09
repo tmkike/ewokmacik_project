@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using MongoDB.Bson;
 using MongoDB.Driver;
 
 record ErrorResponse(string Message);
@@ -12,7 +11,7 @@ sealed record BookAvailabilityRequest(bool? Available);
 
 sealed record ValidatedBookPayload(string Title, string Author, int Year, string Genre, bool Available);
 
-sealed record BookQueryFilterResult(FilterDefinition<BsonDocument> Filter, string? ErrorMessage);
+sealed record BookQueryFilterResult(FilterDefinition<BookDocument> Filter, string? ErrorMessage);
 
 sealed record BookInventoryResponse(
     [property: JsonPropertyName("_id")] string Id,
