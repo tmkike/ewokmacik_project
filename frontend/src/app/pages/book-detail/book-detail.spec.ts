@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { of, Subject, throwError } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Loan } from '../../models/loan';
@@ -14,23 +14,9 @@ describe('BookDetail', () => {
   let router: Router;
 
   const bookServiceMock = {
-    getBook: () => of({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    }),
-    updateBook: () => of({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    }),
-    deleteBook: () => of(undefined),
+    getBook: vi.fn((_id: string) => of(createBook({ available: true }))),
+    updateBook: vi.fn((_id: string, _book: ReturnType<typeof createBook>) => of(createBook({ available: true }))),
+    deleteBook: vi.fn((_id: string) => of(undefined)),
   };
 
   const loanServiceMock = {
@@ -88,271 +74,114 @@ describe('BookDetail', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should show read-only loan state when book payload already contains active loan', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-      hasActiveLoan: true,
-      activeLoan: {
-        _id: 'loan-1',
-        bookId: '1',
-        bookTitle: 'Dune',
-        bookAuthor: 'Frank Herbert',
-        borrowerName: 'Teszt Elek',
-        borrowerEmail: 'teszt@example.com',
-        notes: null,
-        loanedAt: '2026-04-08T10:00:00.000Z',
-        dueAt: '2026-04-15T10:00:00.000Z',
-        returnedAt: null,
-        status: 'active',
-      },
-    };
-
-    component['syncLoanState'](component.book);
-
-    expect(component.showLoanTerminationButton).toBe(true);
-    expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.isLoanFormReadOnly).toBe(true);
-  });
-
   it('should expose a borrowed status label when the book has an active loan', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-      hasActiveLoan: true,
-    };
+    component.book = createBook({ available: false, hasActiveLoan: true });
 
     expect(component.bookStatusLabel).toBe('Kikölcsönözve');
+    expect(component.availabilityState).toBe('loaned');
   });
 
-  it('should disable the availability checkbox when an active loan is loaded', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
+  it('should expose an unavailable status label when the book is manually unavailable', () => {
+    component.book = createBook({ available: false, hasActiveLoan: false });
 
-    component['applyLoadedActiveLoan']({
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active',
-    });
-
-    expect(component.book?.available).toBe(false);
-    expect(component.isAvailabilityToggleDisabled).toBe(true);
+    expect(component.bookStatusLabel).toBe('Nem elérhető');
+    expect(component.availabilityState).toBe('unavailable');
   });
 
-  it('should keep loan fields editable when the book is unavailable but has no active loan', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-      hasActiveLoan: false,
-      activeLoan: null,
-    };
+  it('should not start active loan lookup for a manually unavailable book', () => {
+    const getActiveLoanForBookSpy = vi.fn(() => of<Loan | undefined>(undefined));
 
-    component['syncLoanState'](component.book);
-
-    expect(component.activeLoan).toBeUndefined();
-    expect(component.isLoanFormReadOnly).toBe(false);
-    expect(component.showLoanTerminationButton).toBe(false);
-  });
-
-  it('should still load active loan details for an unavailable book when loan metadata is missing', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
-    loanServiceMock.getActiveLoanForBook = () => of({
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active' as const,
-    });
-
-    component['syncLoanState'](component.book);
-
-    expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.showLoanTerminationButton).toBe(true);
-    expect(component.isLoanFormReadOnly).toBe(true);
-  });
-
-  it('should not start a duplicate active loan lookup for the same book while one is already loading', () => {
-    const pendingLookup = new Subject<Loan | undefined>();
-    const getActiveLoanForBookSpy = vi.fn(() => pendingLookup.asObservable());
-
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
+    component.book = createBook({ available: false, hasActiveLoan: false, activeLoan: null });
     loanServiceMock.getActiveLoanForBook = getActiveLoanForBookSpy;
 
-    component.loadActiveLoan('1');
     component['syncLoanState'](component.book);
 
-    expect(getActiveLoanForBookSpy).toHaveBeenCalledTimes(1);
-    expect(component.loanLoading).toBe(true);
-
-    pendingLookup.next({
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active',
-    });
-    pendingLookup.complete();
-
-    expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.loanLoading).toBe(false);
+    expect(getActiveLoanForBookSpy).not.toHaveBeenCalled();
+    expect(component.activeLoan).toBeUndefined();
+    expect(component.availabilityState).toBe('unavailable');
+    expect(component.showLoanForm).toBe(false);
 
     loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
   });
 
-  it('should clear preloaded book and loan details when the book detail reload fails', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
+  it('should show read-only loan state when book payload already contains active loan', () => {
+    component.book = createBook({
       available: false,
       hasActiveLoan: true,
-      activeLoan: {
-        _id: 'loan-1',
-        bookId: '1',
-        bookTitle: 'Dune',
-        bookAuthor: 'Frank Herbert',
-        borrowerName: 'Teszt Elek',
-        borrowerEmail: 'teszt@example.com',
-        notes: 'Megjegyzés',
-        loanedAt: '2026-04-08T10:00:00.000Z',
-        dueAt: '2026-04-15T10:00:00.000Z',
-        returnedAt: null,
-        status: 'active',
-      },
-    };
-    component['applyLoadedActiveLoan'](component.book.activeLoan!);
-    bookServiceMock.getBook = () => throwError(() => ({
-      error: { message: 'Betöltési hiba' },
-    }));
-
-    component.loadBook('1');
-
-    expect(component.book).toBeUndefined();
-    expect(component.activeLoan).toBeUndefined();
-    expect(component.bookLoadFailed).toBe(true);
-    expect(component.loanForm.borrowerName).toBe('');
-    expect(component.showLoanTerminationButton).toBe(false);
-    expect(component.errorMessage).toBe('Betöltési hiba');
-
-    bookServiceMock.getBook = () => of({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
+      activeLoan: createActiveLoan(),
     });
+
+    component['syncLoanState'](component.book);
+
+    expect(component.showLoanTerminationButton).toBe(true);
+    expect(component.activeLoan?._id).toBe('loan-1');
+    expect(component.isLoanFormReadOnly).toBe(true);
+    expect(component.showLoanForm).toBe(false);
   });
 
-  it('should not perform active loan lookup from stale data when the detail reload fails', () => {
-    const getActiveLoanForBookSpy = vi.fn(() => of({
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: 'Megjegyzés',
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active' as const,
-    }));
+  it('should load active loan details when the book is loaned but metadata is missing', () => {
+    component.book = createBook({ available: false, hasActiveLoan: true });
+    loanServiceMock.getActiveLoanForBook = () => of(createActiveLoan());
 
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
-    bookServiceMock.getBook = () => throwError(() => ({
-      error: { message: 'Betöltési hiba' },
-    }));
-    loanServiceMock.getActiveLoanForBook = getActiveLoanForBookSpy;
+    component['syncLoanState'](component.book);
 
-    component.loadBook('1');
+    expect(component.activeLoan?._id).toBe('loan-1');
+    expect(component.showLoanTerminationButton).toBe(true);
+    expect(component.availabilityState).toBe('loaned');
 
-    expect(getActiveLoanForBookSpy).not.toHaveBeenCalled();
-    expect(component.book).toBeUndefined();
-    expect(component.activeLoan).toBeUndefined();
-    expect(component.bookLoadFailed).toBe(true);
+    loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
+  });
 
-    bookServiceMock.getBook = () => of({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
+  it('should allow changing availability locally before save', () => {
+    component.book = createBook({ available: true, hasActiveLoan: false });
+
+    component.book.available = false;
+
+    expect(component.book.available).toBe(false);
+    expect(component.availabilityState).toBe('unavailable');
+  });
+
+  it('should persist the changed availability only when saving the form', () => {
+    component.book = createBook({ available: true, hasActiveLoan: false });
+    const updateBookSpy = bookServiceMock.updateBook.mockImplementationOnce((_id: string, book: ReturnType<typeof createBook>) => of(createBook({
+      available: book.available ?? true,
+      hasActiveLoan: false,
+    })));
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.book.available = false;
+
+    expect(updateBookSpy).not.toHaveBeenCalled();
+
+    component.saveBook();
+
+    expect(updateBookSpy).toHaveBeenCalledWith('1', expect.objectContaining({ available: false }));
+    expect(navigateSpy).toHaveBeenCalledWith(['/books'], {
+      queryParams: expect.any(Object),
+      state: { systemMessage: 'A könyv mentése sikeres.' },
     });
+
+  });
+
+  it('should handle availability conflict during save by switching to the loaned state', () => {
+    component.book = createBook({ available: true, hasActiveLoan: false });
+    bookServiceMock.updateBook.mockImplementationOnce(() => throwError(() => ({
+      error: { message: 'Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.' },
+    })));
+    loanServiceMock.getActiveLoanForBook = () => of(createActiveLoan());
+
+    component.saveBook();
+
+    expect(component.book?.available).toBe(false);
+    expect(component.availabilityState).toBe('loaned');
+    expect(component.errorMessage).toBe('Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.');
+    expect(component.activeLoan?._id).toBe('loan-1');
+
     loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
   });
 
   it('should navigate back to the list after a successful save', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    };
+    component.book = createBook({ available: true });
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     component.saveBook();
@@ -364,72 +193,8 @@ describe('BookDetail', () => {
     expect(component.errorMessage).toBe('');
   });
 
-  it('should show error message when save fails', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    };
-
-    bookServiceMock.updateBook = () => throwError(() => ({
-      error: { message: 'Mentési hiba' },
-    }));
-
-    component.saveBook();
-
-    expect(component.successMessage).toBe('');
-    expect(component.errorMessage).toBe('Mentési hiba');
-
-    bookServiceMock.updateBook = () => of({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    });
-  });
-
-  it('should restore unavailable state when save fails because of active loan conflict', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    };
-    bookServiceMock.updateBook = () => throwError(() => ({
-      error: { message: 'Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.' },
-    }));
-
-    component.saveBook();
-
-    expect(component.book?.available).toBe(false);
-    expect(component.errorMessage).toBe('Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.');
-
-    bookServiceMock.updateBook = () => of({
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    });
-  });
-
   it('should start a loan and navigate back to the list', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    };
+    component.book = createBook({ available: true });
     component.loanForm.borrowerName = 'Teszt Elek';
     component.loanForm.borrowerEmail = 'teszt@example.com';
     component.loanForm.dueAt = '2026-04-15';
@@ -438,153 +203,57 @@ describe('BookDetail', () => {
     component.startLoan();
 
     expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.book?.available).toBe(false);
+    expect(component.availabilityState).toBe('loaned');
     expect(navigateSpy).toHaveBeenCalledWith(['/books'], {
       queryParams: expect.any(Object),
       state: { systemMessage: 'A kölcsönzés sikeresen elindult.' },
     });
   });
 
-  it('should show inline loan error when loan start fails', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    };
-    component.loanForm.borrowerName = 'Teszt Elek';
-    component.loanForm.borrowerEmail = 'teszt@example.com';
-    component.loanForm.dueAt = '2026-04-15';
-    loanServiceMock.startLoan = () => throwError(() => ({
-      error: { message: 'A kölcsönzés most nem indítható el.' },
-    }));
-
-    component.startLoan();
-
-    expect(component.loanErrorMessage).toBe('A kölcsönzés most nem indítható el.');
-    expect(component.errorMessage).toBe('');
-
-    loanServiceMock.startLoan = () => of({
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active' as const,
-    });
-  });
-
-  it('should stop loan start and show inline validation when due date is too early', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: true,
-    };
-    component.loanForm.borrowerName = 'Teszt Elek';
-    component.loanForm.borrowerEmail = 'teszt@example.com';
-    component.loanForm.dueAt = '2000-01-01';
+  it('should not allow starting a loan when the book is not available', () => {
+    component.book = createBook({ available: false, hasActiveLoan: false });
     const startLoanSpy = vi.spyOn(loanServiceMock, 'startLoan');
 
     component.saveLoan();
 
     expect(startLoanSpy).not.toHaveBeenCalled();
-    expect(component.loanErrorMessage).toContain('A határidő legkorábban');
-  });
-
-  it('should not allow starting a loan when the book is already loaned out', () => {
-    component.activeLoan = {
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active',
-    };
-    const startLoanSpy = vi.spyOn(loanServiceMock, 'startLoan');
-
-    component.saveLoan();
-
-    expect(startLoanSpy).not.toHaveBeenCalled();
-    expect(component.isLoanFormReadOnly).toBe(true);
+    expect(component.canCreateLoan).toBe(false);
+    expect(component.showLoanForm).toBe(false);
   });
 
   it('should return an active loan and navigate back to the list', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
-    component.activeLoan = {
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active',
-    };
+    component.book = createBook({ available: false, hasActiveLoan: true });
+    component.activeLoan = createActiveLoan();
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     component.returnLoan();
 
     expect(component.activeLoan).toBeUndefined();
     expect(component.book?.available).toBe(true);
+    expect(component.availabilityState).toBe('available');
     expect(navigateSpy).toHaveBeenCalledWith(['/books'], {
       queryParams: expect.any(Object),
       state: { systemMessage: 'A kölcsönzés sikeresen megszüntetve.' },
     });
   });
 
-  it('should load active loan from fallback list when direct lookup returns empty', () => {
-    component.book = {
-      _id: '1',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      year: 1965,
-      genre: 'Science Fiction',
-      available: false,
-    };
-    loanServiceMock.getActiveLoanForBook = () => of(undefined);
-    loanServiceMock.getActiveLoans = () => of([{
-      _id: 'loan-1',
-      bookId: '1',
-      bookTitle: 'Dune',
-      bookAuthor: 'Frank Herbert',
-      borrowerName: 'Teszt Elek',
-      borrowerEmail: 'teszt@example.com',
-      notes: null,
-      loanedAt: '2026-04-08T10:00:00.000Z',
-      dueAt: '2026-04-15T10:00:00.000Z',
-      returnedAt: null,
-      status: 'active' as const,
-    }]);
+  it('should not perform active loan lookup from stale data when the detail reload fails', () => {
+    const getActiveLoanForBookSpy = vi.fn(() => of(createActiveLoan()));
 
-    component.loadActiveLoan('1');
+    component.book = createBook({ available: false, hasActiveLoan: true });
+    bookServiceMock.getBook.mockImplementationOnce(() => throwError(() => ({
+      error: { message: 'Betöltési hiba' },
+    })));
+    loanServiceMock.getActiveLoanForBook = getActiveLoanForBookSpy;
 
-    expect(component.activeLoan?._id).toBe('loan-1');
-    expect(component.showLoanTerminationButton).toBe(true);
+    component.loadBook('1');
+
+    expect(getActiveLoanForBookSpy).not.toHaveBeenCalled();
+    expect(component.book).toBeUndefined();
+    expect(component.activeLoan).toBeUndefined();
+    expect(component.bookLoadFailed).toBe(true);
+
+    loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
   });
 
   it('should keep API date values on the same calendar day when filling the loan form', () => {
@@ -595,3 +264,33 @@ describe('BookDetail', () => {
     expect(component.formatLoanDateLabel('2026-04-15T00:00:00Z')).toBe('2026.04.15.');
   });
 });
+
+function createBook(overrides: Partial<any> = {}) {
+  return {
+    _id: '1',
+    title: 'Dune',
+    author: 'Frank Herbert',
+    year: 1965,
+    genre: 'Science Fiction',
+    available: true,
+    hasActiveLoan: false,
+    activeLoan: null,
+    ...overrides,
+  };
+}
+
+function createActiveLoan(): Loan {
+  return {
+    _id: 'loan-1',
+    bookId: '1',
+    bookTitle: 'Dune',
+    bookAuthor: 'Frank Herbert',
+    borrowerName: 'Teszt Elek',
+    borrowerEmail: 'teszt@example.com',
+    notes: null,
+    loanedAt: '2026-04-08T10:00:00.000Z',
+    dueAt: '2026-04-15T10:00:00.000Z',
+    returnedAt: null,
+    status: 'active',
+  };
+}

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, timeout } from 'rxjs';
@@ -18,6 +18,8 @@ type LoanFormModel = {
   dueAt: string;
   notes: string;
 };
+
+type AvailabilityState = 'available' | 'unavailable' | 'loaned';
 
 @Component({
   selector: 'app-book-detail',
@@ -47,6 +49,7 @@ export class BookDetail implements OnInit {
     private readonly router: Router,
     private readonly bookService: BookService,
     private readonly loanService: LoanService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     const navigationBook = this.router.getCurrentNavigation()?.extras.state?.['book'] as Book | undefined;
 
@@ -74,8 +77,24 @@ export class BookDetail implements OnInit {
     });
   }
 
+  get availabilityState(): AvailabilityState {
+    if (this.activeLoan || this.book?.hasActiveLoan || this.hasActiveLoanConflict) {
+      return 'loaned';
+    }
+
+    if (this.book?.available) {
+      return 'available';
+    }
+
+    return 'unavailable';
+  }
+
   get canCreateLoan(): boolean {
-    return Boolean(this.book?.available && !this.activeLoan);
+    return Boolean(this.book?._id && this.availabilityState === 'available' && !this.activeLoan);
+  }
+
+  get showLoanForm(): boolean {
+    return this.canCreateLoan;
   }
 
   get minimumLoanDueDate(): string {
@@ -90,7 +109,7 @@ export class BookDetail implements OnInit {
   }
 
   get isLoanedState(): boolean {
-    return Boolean(this.activeLoan);
+    return this.availabilityState === 'loaned';
   }
 
   get showLoanTerminationButton(): boolean {
@@ -98,23 +117,23 @@ export class BookDetail implements OnInit {
   }
 
   get canDeleteBook(): boolean {
-    return !this.activeLoan && !this.hasActiveLoanConflict && !this.loanLoading && !this.loanProcessing && !this.saving;
+    return !this.activeLoan
+      && !this.hasActiveLoanConflict
+      && !this.loanLoading
+      && !this.loanProcessing
+      && !this.saving;
   }
 
   get bookStatusLabel(): string {
-    if (this.activeLoan || this.book?.hasActiveLoan || this.hasActiveLoanConflict) {
+    if (this.availabilityState === 'loaned') {
       return BOOK_AVAILABILITY_LABELS.loaned;
     }
 
-    if (this.book?.available) {
+    if (this.availabilityState === 'available') {
       return BOOK_AVAILABILITY_LABELS.available;
     }
 
     return BOOK_AVAILABILITY_LABELS.unavailable;
-  }
-
-  get isAvailabilityToggleDisabled(): boolean {
-    return this.loanLoading || this.loanProcessing || this.saving || Boolean(this.activeLoan) || this.hasActiveLoanConflict;
   }
 
   get isLoanFormReadOnly(): boolean {
@@ -130,12 +149,14 @@ export class BookDetail implements OnInit {
     this.bookService.getBook(id).pipe(
       finalize(() => {
         this.loading = false;
+        this.refreshView();
       }),
     ).subscribe({
       next: (book) => {
         this.book = book;
         this.bookLoadFailed = false;
         this.syncLoanState(book);
+        this.refreshView();
       },
       error: (error: HttpErrorResponse) => {
         this.cancelActiveLoanLookup();
@@ -143,6 +164,7 @@ export class BookDetail implements OnInit {
         this.clearLoadedBookState();
         this.bookLoadFailed = true;
         this.errorMessage = this.extractErrorMessage(error, `Nem sikerült betölteni a könyvet. Azonosító: ${id}`);
+        this.refreshView();
       },
     });
   }
@@ -165,6 +187,7 @@ export class BookDetail implements OnInit {
         if (loan) {
           this.applyLoadedActiveLoan(loan);
           this.finishActiveLoanLookup(requestId);
+          this.refreshView();
           return;
         }
 
@@ -172,31 +195,7 @@ export class BookDetail implements OnInit {
       },
       error: () => {
         this.handleActiveLoanLookupError(bookId, requestId);
-      },
-    });
-  }
-
-  private loadActiveLoanFallback(bookId: string, requestId: number): void {
-    this.loanService.getActiveLoans().pipe(
-      timeout(5000),
-    ).subscribe({
-      next: (loans) => {
-        if (!this.isCurrentActiveLoanLookup(bookId, requestId)) {
-          return;
-        }
-
-        const fallbackLoan = loans.find((loan) => String(loan.bookId) === bookId);
-
-        if (fallbackLoan) {
-          this.applyLoadedActiveLoan(fallbackLoan);
-          this.finishActiveLoanLookup(requestId);
-          return;
-        }
-
-        this.handleMissingActiveLoan(requestId);
-      },
-      error: () => {
-        this.handleActiveLoanLookupError(bookId, requestId);
+        this.refreshView();
       },
     });
   }
@@ -221,18 +220,10 @@ export class BookDetail implements OnInit {
         this.navigateToBooks('A könyv mentése sikeres.');
       },
       error: (error: HttpErrorResponse) => {
-        if (this.isActiveLoanConflict(error) && this.book?._id) {
-          const conflictedBookId = this.book._id;
-          this.book = {
-            ...this.book,
-            available: false,
-          };
-          this.hasActiveLoanConflict = true;
-          this.loadActiveLoan(conflictedBookId);
-        }
-
+        this.handleAvailabilityConflict(error);
         this.errorMessage = this.extractErrorMessage(error, 'Nem sikerült elmenteni a változásokat.');
         this.successMessage = '';
+        this.refreshView();
       },
     });
   }
@@ -254,7 +245,7 @@ export class BookDetail implements OnInit {
   }
 
   startLoan(): void {
-    if (!this.book?._id) {
+    if (!this.book?._id || !this.canCreateLoan) {
       return;
     }
 
@@ -293,6 +284,7 @@ export class BookDetail implements OnInit {
         this.loanErrorMessage = this.extractErrorMessage(error, 'Nem sikerült elindítani a kölcsönzést.');
         this.errorMessage = '';
         this.successMessage = '';
+        this.refreshView();
       },
     });
   }
@@ -342,13 +334,14 @@ export class BookDetail implements OnInit {
         this.loanErrorMessage = this.extractErrorMessage(error, 'Nem sikerült megszüntetni a kölcsönzést.');
         this.errorMessage = '';
         this.successMessage = '';
+        this.refreshView();
       },
     });
   }
 
   deleteBook(): void {
     if (this.activeLoan) {
-      this.errorMessage = 'Kikölcsönzött könyv nem törölhető.';
+      this.errorMessage = 'Kikölcsönözött könyv nem törölhető.';
       return;
     }
 
@@ -362,6 +355,7 @@ export class BookDetail implements OnInit {
       },
       error: (error: HttpErrorResponse) => {
         this.errorMessage = this.extractErrorMessage(error, 'Nem sikerült törölni a könyvet.');
+        this.refreshView();
       },
     });
   }
@@ -383,6 +377,12 @@ export class BookDetail implements OnInit {
       return;
     }
 
+    if (book.activeLoan) {
+      this.applyLoadedActiveLoan(book.activeLoan);
+      this.cancelActiveLoanLookup();
+      return;
+    }
+
     if (book.available) {
       this.activeLoan = undefined;
       this.hasActiveLoanConflict = false;
@@ -392,15 +392,18 @@ export class BookDetail implements OnInit {
       return;
     }
 
-    if (book.activeLoan) {
-      this.applyLoadedActiveLoan(book.activeLoan);
+    if (!book.hasActiveLoan) {
+      this.activeLoan = undefined;
+      this.hasActiveLoanConflict = false;
       this.cancelActiveLoanLookup();
+      this.loanErrorMessage = '';
+      this.loanForm = this.createEmptyLoanForm();
       return;
     }
 
     this.activeLoan = undefined;
     this.loanForm = this.createEmptyLoanForm();
-    this.hasActiveLoanConflict = Boolean(book.hasActiveLoan);
+    this.hasActiveLoanConflict = true;
     this.loadActiveLoan(book._id);
   }
 
@@ -489,6 +492,34 @@ export class BookDetail implements OnInit {
     return this.activeLoanRequestId === requestId && this.activeLoanRequestBookId === bookId;
   }
 
+  private loadActiveLoanFallback(bookId: string, requestId: number): void {
+    this.loanService.getActiveLoans().pipe(
+      timeout(5000),
+    ).subscribe({
+      next: (loans) => {
+        if (!this.isCurrentActiveLoanLookup(bookId, requestId)) {
+          return;
+        }
+
+        const fallbackLoan = loans.find((loan) => String(loan.bookId) === bookId);
+
+        if (fallbackLoan) {
+          this.applyLoadedActiveLoan(fallbackLoan);
+          this.finishActiveLoanLookup(requestId);
+          this.refreshView();
+          return;
+        }
+
+        this.handleMissingActiveLoan(requestId);
+        this.refreshView();
+      },
+      error: () => {
+        this.handleActiveLoanLookupError(bookId, requestId);
+        this.refreshView();
+      },
+    });
+  }
+
   private handleMissingActiveLoan(requestId: number): void {
     this.activeLoan = undefined;
 
@@ -499,10 +530,8 @@ export class BookDetail implements OnInit {
       };
     }
 
-    if (this.book?.available) {
-      this.loanForm = this.createEmptyLoanForm();
-    }
-
+    this.loanForm = this.createEmptyLoanForm();
+    this.hasActiveLoanConflict = false;
     this.finishActiveLoanLookup(requestId);
   }
 
@@ -513,12 +542,22 @@ export class BookDetail implements OnInit {
 
     this.activeLoan = undefined;
     this.loanErrorMessage = 'Nem sikerült betölteni az aktív kölcsönzési adatokat.';
+    this.finishActiveLoanLookup(requestId);
+  }
 
-    if (this.book?.available) {
-      this.loanForm = this.createEmptyLoanForm();
+  private handleAvailabilityConflict(error: HttpErrorResponse): void {
+    if (!this.isActiveLoanConflict(error) || !this.book?._id) {
+      return;
     }
 
-    this.finishActiveLoanLookup(requestId);
+    const conflictedBookId = this.book._id;
+    this.book = {
+      ...this.book,
+      available: false,
+      hasActiveLoan: true,
+    };
+    this.hasActiveLoanConflict = true;
+    this.loadActiveLoan(conflictedBookId);
   }
 
   private toIsoDate(value: string): string {
@@ -613,5 +652,9 @@ export class BookDetail implements OnInit {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  private refreshView(): void {
+    this.changeDetectorRef.detectChanges();
   }
 }

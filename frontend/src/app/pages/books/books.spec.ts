@@ -13,7 +13,7 @@ describe('Books', () => {
 
   const bookServiceMock = {
     getBooks: vi.fn(() => of({
-      items: [],
+      items: [] as Book[],
       totalCount: 0,
       page: 1,
       pageSize: 50,

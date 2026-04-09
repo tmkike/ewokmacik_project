@@ -1,76 +1,16 @@
 <section class="books-page">
-  <div class="books-card">
-    <div class="page-header">
-      <div>
+  <div class="books-shell">
+    <header class="catalog-hero">
+      <div class="catalog-hero__copy">
+        <p class="catalog-kicker">Könyvtári katalógus</p>
         <h1>Könyvek listája</h1>
-        <p class="intro">Kattints egy könyvre a szerkesztéshez vagy törléshez.</p>
+        <p class="intro">Gyors áttekintés, célzott szűrés és egy kattintásos megnyitás szerkesztéshez.</p>
       </div>
 
-      <a class="add-button" routerLink="/add">Új könyv hozzáadása</a>
-    </div>
-
-    <form
-      class="filters"
-      autocomplete="off"
-      novalidate
-      role="search"
-      [formGroup]="filterForm"
-      (ngSubmit)="searchBooks()"
-    >
-      <label>
-        Cím
-        <input
-          type="text"
-          name="bookFilterTitle"
-          autocomplete="off"
-          placeholder="Cím"
-          formControlName="title"
-        />
-      </label>
-
-      <label>
-        Szerző
-        <input
-          type="text"
-          name="bookFilterAuthor"
-          autocomplete="off"
-          placeholder="Szerző"
-          formControlName="author"
-        />
-      </label>
-
-      <label>
-        Kategória
-        <input
-          type="text"
-          name="bookFilterGenre"
-          autocomplete="off"
-          placeholder="Kategória"
-          formControlName="genre"
-        />
-      </label>
-
-      <label>
-        Elérhetőség
-        <select
-          name="bookFilterAvailability"
-          formControlName="available"
-        >
-          <option [ngValue]="null">Mind</option>
-          <option [ngValue]="true">Elérhető</option>
-          <option [ngValue]="false">Nem elérhető</option>
-        </select>
-      </label>
-
-      <div class="filter-actions">
-        <button type="submit" class="filter-button" [disabled]="loading">
-          {{ loading ? 'Keresés...' : 'Keresés' }}
-        </button>
-        <button type="button" class="filter-button secondary" [disabled]="loading" (click)="clearFilters()">
-          Szűrők törlése
-        </button>
+      <div class="catalog-hero__side">
+        <a class="add-button" routerLink="/add">Új könyv hozzáadása</a>
       </div>
-    </form>
+    </header>
 
     <div
       *ngIf="successMessage && successMessageVisible"
@@ -83,18 +23,117 @@
 
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
-    <ul class="book-list" *ngIf="!loading && books.length > 0" aria-label="Könyvek">
-      <li *ngFor="let book of books">
-        <button type="button" class="book-list-item" (click)="openBook(book)">
-          <span class="book-title">{{ book.title }}</span>
-          <span class="book-meta">{{ book.author }} - {{ book.year }} - {{ book.genre }}</span>
-          <span [class]="getBookAvailabilityClass(book)">{{ getBookAvailabilityLabel(book) }}</span>
-        </button>
-      </li>
-    </ul>
+    <div class="catalog-layout">
+      <form
+        class="filters-panel"
+        autocomplete="off"
+        novalidate
+        role="search"
+        [formGroup]="filterForm"
+        (ngSubmit)="searchBooks()"
+      >
+        <div class="filters-panel__header">
+          <h2>Szűrés</h2>
+          <p>Szűkíts cím, szerző, kategória vagy elérhetőség alapján.</p>
+        </div>
 
-    <p class="status" *ngIf="!loading && books.length === 0 && !errorMessage">
-      Nincs megjeleníthető könyv.
-    </p>
+        <label>
+          <span class="filter-label">Cím</span>
+          <input
+            type="text"
+            name="bookFilterTitle"
+            autocomplete="off"
+            placeholder="Például: A kis herceg"
+            formControlName="title"
+          />
+        </label>
+
+        <label>
+          <span class="filter-label">Szerző</span>
+          <input
+            type="text"
+            name="bookFilterAuthor"
+            autocomplete="off"
+            placeholder="Például: Szabó Magda"
+            formControlName="author"
+          />
+        </label>
+
+        <label>
+          <span class="filter-label">Kategória</span>
+          <input
+            type="text"
+            name="bookFilterGenre"
+            autocomplete="off"
+            placeholder="Például: Regény"
+            formControlName="genre"
+          />
+        </label>
+
+        <label>
+          <span class="filter-label">Elérhetőség</span>
+          <select
+            name="bookFilterAvailability"
+            formControlName="available"
+          >
+            <option [ngValue]="null">Mind</option>
+            <option [ngValue]="true">Elérhető</option>
+            <option [ngValue]="false">Nem elérhető</option>
+          </select>
+        </label>
+
+        <div class="filter-actions">
+          <button type="submit" class="filter-button" [disabled]="loading">
+            {{ loading ? 'Keresés...' : 'Keresés' }}
+          </button>
+          <button type="button" class="filter-button secondary" [disabled]="loading" (click)="clearFilters()">
+            Szűrők törlése
+          </button>
+        </div>
+      </form>
+
+      <section class="catalog-results" aria-label="Könyvek">
+        <div class="results-header">
+          <div>
+            <h2>Találatok</h2>
+            <p *ngIf="!loading">{{ books.length }} könyv látható a jelenlegi nézetben.</p>
+            <p *ngIf="loading">A katalógus frissítése folyamatban van.</p>
+          </div>
+
+          <div class="results-legend" *ngIf="!loading && books.length > 0">
+            <span class="legend-pill legend-pill--available">Elérhető</span>
+            <span class="legend-pill legend-pill--loaned">Kikölcsönözve</span>
+            <span class="legend-pill legend-pill--unavailable">Nem elérhető</span>
+          </div>
+        </div>
+
+        <div class="book-list-head" *ngIf="!loading && books.length > 0" aria-hidden="true">
+          <span>Cím</span>
+          <span>Szerző</span>
+          <span>Év</span>
+          <span>Állapot</span>
+        </div>
+
+        <ul class="book-list" *ngIf="!loading && books.length > 0">
+          <li *ngFor="let book of books">
+            <button type="button" class="book-list-item" (click)="openBook(book)">
+              <span class="book-main">
+                <span class="book-title">{{ book.title }}</span>
+                <span class="book-genre">{{ book.genre }}</span>
+              </span>
+
+              <span class="book-author">{{ book.author }}</span>
+              <span class="book-year">{{ book.year }}</span>
+              <span [class]="getBookAvailabilityClass(book)">{{ getBookAvailabilityLabel(book) }}</span>
+            </button>
+          </li>
+        </ul>
+
+        <div class="empty-state" *ngIf="!loading && books.length === 0 && !errorMessage">
+          <h3>Nincs megjeleníthető könyv</h3>
+          <p>Próbálj meg más szűrőket használni, vagy töröld a keresési feltételeket.</p>
+        </div>
+      </section>
+    </div>
   </div>
 </section>

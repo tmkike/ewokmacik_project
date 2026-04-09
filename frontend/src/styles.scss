@@ -1,1 +1,145 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  color-scheme: light;
+  --page-bg:
+    radial-gradient(circle at top, rgba(86, 173, 216, 0.2), transparent 34%),
+    radial-gradient(circle at left bottom, rgba(56, 189, 149, 0.14), transparent 26%),
+    linear-gradient(180deg, #f4fbff 0%, #eef5fb 42%, #f7fafc 100%);
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-strong: #ffffff;
+  --surface-soft: #eef7fb;
+  --surface-muted: #f1f6fa;
+  --border: #d6e4ee;
+  --border-strong: #9ec0d4;
+  --text-strong: #142330;
+  --text-main: #314756;
+  --text-muted: #6a8191;
+  --accent: #0f766e;
+  --accent-strong: #155e75;
+  --accent-soft: #d7f0ee;
+  --success-bg: #e7f6ee;
+  --success-text: #156942;
+  --danger-bg: #fdecec;
+  --danger-text: #9d1f1f;
+  --shadow-soft: 0 18px 48px rgba(42, 78, 104, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(21, 94, 117, 0.18);
+  --motion-fast: 220ms;
+  --motion-base: 520ms;
+  --motion-slow: 9s;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--text-main);
+  font-family: Aptos, "Segoe UI Variable", "Trebuchet MS", sans-serif;
+  line-height: 1.5;
+  overflow-x: hidden;
+  position: relative;
+}
+
+body::before,
+body::after {
+  border-radius: 999px;
+  content: '';
+  filter: blur(18px);
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+body::before {
+  animation: ambientFloat var(--motion-slow) ease-in-out infinite;
+  background: radial-gradient(circle, rgba(103, 232, 249, 0.18), transparent 68%);
+  height: 18rem;
+  left: -4rem;
+  top: 14rem;
+  width: 18rem;
+}
+
+body::after {
+  animation: ambientFloatReverse calc(var(--motion-slow) + 3s) ease-in-out infinite;
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.14), transparent 70%);
+  bottom: 8rem;
+  height: 20rem;
+  right: -5rem;
+  width: 20rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+@keyframes ambientFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(1.5rem, -1.25rem, 0) scale(1.08);
+  }
+}
+
+@keyframes ambientFloatReverse {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(-1.75rem, 1rem, 0) scale(1.1);
+  }
+}
+
+@keyframes panelReveal {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 1.25rem, 0) scale(0.985);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes cardDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -0.35rem, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

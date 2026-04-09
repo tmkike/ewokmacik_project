@@ -1,61 +1,124 @@
 .home-welcome {
-  min-height: 100vh;
-  background-color: #f3e8d7;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 40px 20px;
-  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 2rem 1rem 2.5rem;
 }
 
 .welcome-card {
+  background: var(--surface);
+  border: 1px solid rgba(214, 228, 238, 0.92);
+  border-radius: 28px;
+  box-shadow: var(--shadow-soft);
+  color: var(--text-main);
+  max-width: 1120px;
+  overflow: hidden;
+  padding: 2.8rem 3rem;
+  position: relative;
   width: 100%;
-  max-width: 1100px;
-  background-color: #fcf7f0;
-  border-radius: 24px;
-  padding: 48px 56px;
-  box-shadow: 0 8px 24px rgba(80, 50, 30, 0.12);
-  color: #4e342e;
+  animation: panelReveal var(--motion-base) var(--motion-ease) both;
+  animation-delay: 60ms;
+}
+
+.welcome-card::after {
+  background:
+    linear-gradient(140deg, rgba(21, 94, 117, 0.09), transparent 70%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(20, 35, 48, 0.08) 0 4px,
+      transparent 4px 16px
+    );
+  border-radius: 20px;
+  content: '';
+  height: 5.6rem;
+  pointer-events: none;
+  position: absolute;
+  right: 2rem;
+  top: 1.8rem;
+  transform: rotate(-10deg);
+  width: 8rem;
+}
+
+.welcome-card > * {
+  animation: panelReveal 620ms var(--motion-ease) both;
+}
+
+.welcome-card > :nth-child(1) {
+  animation-delay: 100ms;
+}
+
+.welcome-card > :nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.welcome-card > :nth-child(3) {
+  animation-delay: 190ms;
+}
+
+.welcome-card > :nth-child(4) {
+  animation-delay: 230ms;
+}
+
+.welcome-card > :nth-child(5) {
+  animation-delay: 270ms;
+}
+
+.welcome-card > :nth-child(6) {
+  animation-delay: 310ms;
 }
 
 .welcome-card h1 {
-  font-size: 2.4rem;
-  margin-bottom: 28px;
-  color: #4e342e;
+  color: var(--text-strong);
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  margin-bottom: 1.5rem;
 }
 
 .welcome-card h2 {
-  font-size: 1.8rem;
-  margin-top: 36px;
-  margin-bottom: 18px;
-  color: #5d4037;
+  color: var(--accent-strong);
+  font-size: 1.7rem;
+  margin-bottom: 1rem;
+  margin-top: 2rem;
 }
 
 .welcome-card p {
-  font-size: 1.2rem;
+  color: var(--text-main);
+  font-size: 1.08rem;
   line-height: 1.8;
-  margin-bottom: 22px;
-  color: #5c4033;
+  margin-bottom: 1rem;
 }
 
 .welcome-card ul {
-  padding-left: 24px;
-  margin-bottom: 24px;
+  background: rgba(240, 248, 252, 0.82);
+  border: 1px solid rgba(214, 228, 238, 0.92);
+  border-radius: 22px;
+  color: var(--text-main);
+  margin-bottom: 1.2rem;
+  padding: 1.15rem 1.35rem 1.15rem 2.4rem;
 }
 
 .welcome-card li {
-  font-size: 1.15rem;
   line-height: 1.7;
-  margin-bottom: 14px;
-  color: #5c4033;
+  margin-bottom: 0.75rem;
+}
+
+.welcome-card li:last-child {
+  margin-bottom: 0;
 }
 
 .intro {
-  font-size: 1.25rem;
+  color: var(--text-muted);
+  font-size: 1.15rem;
 }
 
 .closing {
-  margin-top: 28px;
-  font-weight: 600;
-  color: #4e342e;
+  color: var(--accent-strong);
+  font-weight: 700;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 720px) {
+  .welcome-card {
+    border-radius: 22px;
+    padding: 1.4rem;
+  }
 }
