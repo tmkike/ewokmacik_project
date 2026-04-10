@@ -74,6 +74,44 @@ describe('BookDetail', () => {
     expect(component).toBeTruthy();
   });
 
+  it('should expose the full available resting state', () => {
+    component.book = createBook({
+      available: true,
+      hasActiveLoan: false,
+      activeLoan: null,
+    });
+    component.activeLoan = undefined;
+    component.hasActiveLoanConflict = false;
+    component.loanLoading = false;
+    component.saving = false;
+    component.loanProcessing = false;
+    component.bookLoadFailed = false;
+
+    expect(component.availabilityState).toBe('available');
+    expect(component.bookStatusLabel).toBe('\u0045\u006c\u00e9\u0072\u0068\u0065\u0074\u0151');
+    expect(component.showLoanForm).toBe(true);
+    expect(component.showLoanTerminationButton).toBe(false);
+    expect(component.canDeleteBook).toBe(true);
+    expect(component.isLoanFormReadOnly).toBe(false);
+  });
+
+  it('should keep delete disabled for a loaned route-state before loan details are loaded', () => {
+    component.book = createBook({
+      available: false,
+      hasActiveLoan: true,
+      activeLoan: null,
+    });
+    component.activeLoan = undefined;
+    component.hasActiveLoanConflict = false;
+    component.loanLoading = false;
+    component.saving = false;
+    component.loanProcessing = false;
+    component.bookLoadFailed = false;
+
+    expect(component.availabilityState).toBe('loaned');
+    expect(component.canDeleteBook).toBe(false);
+  });
+
   it('should expose a borrowed status label when the book has an active loan', () => {
     component.book = createBook({ available: false, hasActiveLoan: true });
 

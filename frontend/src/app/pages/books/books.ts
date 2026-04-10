@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ChangeDetectorRef, Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { skip } from 'rxjs';
+import { EMPTY, catchError, skip } from 'rxjs';
 
 import { Book, BookFilters } from '../../models/book';
 import { BookService } from '../../services/book.service';
@@ -48,7 +48,8 @@ export class Books implements OnInit, OnDestroy {
       skip(1),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(() => {
-      this.refreshBooks(true);
+      this.resetFiltersForPageEntry();
+      this.loadBooks();
     });
   }
 
@@ -67,7 +68,7 @@ export class Books implements OnInit, OnDestroy {
 
   openBook(book: Book): void {
     if (!book._id) {
-      this.errorMessage = 'A könyvnek nincs azonosítója, ezért nem nyitható meg.';
+      this.errorMessage = 'A k\u00f6nyvnek nincs azonos\u00edt\u00f3ja, ez\u00e9rt nem nyithat\u00f3 meg.';
       return;
     }
 
@@ -94,30 +95,22 @@ export class Books implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = '';
 
-    // A szabványos keresőűrlap a szerveroldali szűrést használja, így a gomb és az Enter ugyanúgy működik.
     this.bookService.getBooks(filters).pipe(
       takeUntilDestroyed(this.destroyRef),
+      catchError(() => {
+        this.errorMessage = 'Nem siker\u00fclt bet\u00f6lteni a k\u00f6nyveket.';
+        this.books = [];
+        return EMPTY;
+      }),
     ).subscribe({
       next: (response) => {
         this.books = response.items;
-        this.loading = false;
-        this.changeDetectorRef.detectChanges();
       },
-      error: () => {
-        this.errorMessage = 'Nem sikerült betölteni a könyveket.';
-        this.books = [];
+      complete: () => {
         this.loading = false;
         this.changeDetectorRef.detectChanges();
       },
     });
-  }
-
-  private refreshBooks(resetFilters: boolean): void {
-    if (resetFilters) {
-      this.resetFiltersForPageEntry();
-    }
-
-    this.loadBooks();
   }
 
   private readNavigationMessage(): void {

@@ -51,7 +51,9 @@ export class Mod {
   }
 
   saveBook(): void {
-    if (!this.selectedBook?._id) {
+    const selectedBook = this.selectedBook;
+
+    if (!selectedBook?._id) {
       return;
     }
 
@@ -59,7 +61,7 @@ export class Mod {
     this.successMessage = '';
     this.errorMessage = '';
 
-    this.bookService.updateBook(this.selectedBook._id, this.selectedBook).pipe(
+    this.bookService.updateBook(selectedBook._id, selectedBook).pipe(
       finalize(() => {
         this.saving = false;
       }),
@@ -80,13 +82,12 @@ export class Mod {
       return;
     }
 
-    this.bookService.updateAvailability(book._id, !book.available).subscribe({
+    const bookId = book._id;
+
+    this.bookService.updateAvailability(bookId, !book.available).subscribe({
       next: (updatedBook) => {
         this.books = this.books.map((item) => item._id === updatedBook._id ? updatedBook : item);
-
-        if (this.selectedBook?._id === updatedBook._id) {
-          this.selectedBook = { ...updatedBook };
-        }
+        this.selectedBook = this.selectedBook?._id === bookId ? { ...updatedBook } : this.selectedBook;
       },
       error: () => {
         this.errorMessage = 'Nem sikerült módosítani az elérhetőséget.';
@@ -99,13 +100,13 @@ export class Mod {
       return;
     }
 
-    this.bookService.deleteBook(book._id).subscribe({
-      next: () => {
-        this.books = this.books.filter((item) => item._id !== book._id);
+    const bookId = book._id;
 
-        if (this.selectedBook?._id === book._id) {
-          this.selectedBook = undefined;
-        }
+    this.bookService.deleteBook(bookId).subscribe({
+      next: () => {
+        this.books = this.books.filter((item) => item._id !== bookId);
+
+        this.selectedBook = this.selectedBook?._id === bookId ? undefined : this.selectedBook;
 
         this.successMessage = 'A könyv sikeresen törölve.';
       },

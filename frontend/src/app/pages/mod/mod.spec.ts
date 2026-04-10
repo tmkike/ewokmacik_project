@@ -8,7 +8,12 @@ describe('Mod', () => {
   let component: Mod;
   let fixture: ComponentFixture<Mod>;
   const bookServiceMock = {
-    getBooks: () => of([]),
+    getBooks: () => of({
+      items: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 50,
+    }),
     updateBook: () => of({}),
     updateAvailability: () => of({}),
     deleteBook: () => of(undefined),

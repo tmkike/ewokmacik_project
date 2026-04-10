@@ -11,6 +11,7 @@ import { BookService } from '../../services/book.service';
 import { LoanService } from '../../services/loan.service';
 import { BOOK_AVAILABILITY_LABELS } from '../../shared/book-availability';
 import { extractDateOnly, formatDateOnlyLabel, isIsoDateOnly } from '../../shared/date-only';
+import { validateBookLoanForm } from './book-detail-loan-form.validation';
 
 type LoanFormModel = {
   borrowerName: string;
@@ -105,11 +106,8 @@ export class BookDetail implements OnInit {
   }
 
   get minimumLoanDueDateLabel(): string {
-    return this.formatDateLabel(this.minimumLoanDueDate);
-  }
-
-  get isLoanedState(): boolean {
-    return this.availabilityState === 'loaned';
+    const [year, month, day] = this.minimumLoanDueDate.split('-');
+    return `${year}.${month}.${day}.`;
   }
 
   get showLoanTerminationButton(): boolean {
@@ -117,7 +115,8 @@ export class BookDetail implements OnInit {
   }
 
   get canDeleteBook(): boolean {
-    return !this.activeLoan
+    return this.availabilityState !== 'loaned'
+      && !this.activeLoan
       && !this.hasActiveLoanConflict
       && !this.loanLoading
       && !this.loanProcessing
@@ -229,11 +228,17 @@ export class BookDetail implements OnInit {
   }
 
   saveLoan(): void {
-    if (this.loanProcessing || this.saving || !this.book?._id || this.isLoanedState) {
+    if (this.loanProcessing || this.saving || !this.book?._id || this.availabilityState === 'loaned') {
       return;
     }
 
-    const validationMessage = this.validateLoanForm();
+    const validationMessage = validateBookLoanForm({
+      borrowerName: this.loanForm.borrowerName,
+      borrowerEmail: this.loanForm.borrowerEmail,
+      dueAt: this.loanForm.dueAt,
+      minimumLoanDueDate: this.minimumLoanDueDate,
+      minimumLoanDueDateLabel: this.minimumLoanDueDateLabel,
+    });
 
     if (validationMessage) {
       this.loanErrorMessage = validationMessage;
@@ -564,44 +569,15 @@ export class BookDetail implements OnInit {
     return isIsoDateOnly(value) ? value : '';
   }
 
-  private validateLoanForm(): string | null {
-    const borrowerName = this.loanForm.borrowerName.trim();
-    const borrowerEmail = this.loanForm.borrowerEmail.trim();
-    const dueAt = this.loanForm.dueAt;
-
-    if (!borrowerName) {
-      return 'Add meg a kölcsönző nevét.';
-    }
-
-    if (!borrowerEmail) {
-      return 'Add meg a kölcsönző e-mail-címét.';
-    }
-
-    if (!this.isValidEmail(borrowerEmail)) {
-      return 'Adj meg érvényes e-mail-címet.';
-    }
-
-    if (!dueAt) {
-      return 'Add meg a kölcsönzés határidejét.';
-    }
-
-    if (!isIsoDateOnly(dueAt)) {
-      return 'A határidő formátuma YYYY-MM-DD legyen.';
-    }
-
-    if (dueAt < this.minimumLoanDueDate) {
-      return `A határidő legkorábban ${this.minimumLoanDueDateLabel} lehet.`;
-    }
-
-    return null;
-  }
-
   private isActiveLoanConflict(error: HttpErrorResponse): boolean {
     const sourceText = [
       error.error?.message,
       ...(Array.isArray(error.error?.errors) ? error.error.errors : []),
     ].join(' ');
-    const normalizedSourceText = this.normalizeSearchText(sourceText);
+    const normalizedSourceText = sourceText
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
 
     return normalizedSourceText.includes('aktiv kolcsonz')
       || (normalizedSourceText.includes('kolcsonz') && normalizedSourceText.includes('elerheto'))
@@ -627,15 +603,6 @@ export class BookDetail implements OnInit {
     return extractDateOnly(value);
   }
 
-  private isValidEmail(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  }
-
-  private formatDateLabel(value: string): string {
-    const [year, month, day] = value.split('-');
-    return `${year}.${month}.${day}.`;
-  }
-
   formatLoanDateLabel(value: string | null | undefined): string {
     return formatDateOnlyLabel(value);
   }
@@ -645,13 +612,6 @@ export class BookDetail implements OnInit {
     const month = String(value.getMonth() + 1).padStart(2, '0');
     const day = String(value.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  }
-
-  private normalizeSearchText(value: string): string {
-    return value
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
   }
 
   private refreshView(): void {

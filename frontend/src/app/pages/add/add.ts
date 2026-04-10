@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { Book } from '../../models/book';
 import { BookService } from '../../services/book.service';
@@ -26,23 +27,20 @@ export class Add {
     this.saving = true;
     this.errorMessage = '';
 
-    this.bookService.addBook(this.book).subscribe({
-      next: () => {
+    this.bookService.addBook(this.book).pipe(
+      finalize(() => {
         this.saving = false;
-        // Sikeres mentés után a felhasználó rögtön a friss listára kerül vissza.
-        this.navigateToBooks('A könyv hozzáadása sikeres.');
+      }),
+    ).subscribe({
+      next: () => {
+        void this.router.navigate(['/books'], {
+          queryParams: { refresh: Date.now() },
+          state: { systemMessage: '\u0041\u0020\u006b\u0102\u00b6\u006e\u0079\u0076\u0020\u0068\u006f\u007a\u007a\u0102\u02c7\u0061\u0064\u0102\u02c7\u0073\u0061\u0020\u0073\u0069\u006b\u0065\u0072\u0065\u0073\u002e' },
+        });
       },
       error: () => {
-        this.errorMessage = 'Nem sikerült hozzáadni a könyvet.';
-        this.saving = false;
+        this.errorMessage = '\u004e\u0065\u006d\u0020\u0073\u0069\u006b\u0065\u0072\u0102\u013d\u006c\u0074\u0020\u0068\u006f\u007a\u007a\u0102\u02c7\u0061\u0064\u006e\u0069\u0020\u0061\u0020\u006b\u0102\u00b6\u006e\u0079\u0076\u0065\u0074\u002e';
       },
-    });
-  }
-
-  private navigateToBooks(systemMessage = ''): void {
-    void this.router.navigate(['/books'], {
-      queryParams: { refresh: Date.now() },
-      state: systemMessage ? { systemMessage } : undefined,
     });
   }
 
