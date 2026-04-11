@@ -3,9 +3,11 @@ import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Book } from '../../models/book';
 import { Loan } from '../../models/loan';
 import { BookService } from '../../services/book.service';
 import { LoanService } from '../../services/loan.service';
+import { BOOK_AVAILABILITY_LABELS } from '../../shared/book-availability';
 import { BookDetail } from './book-detail';
 
 describe('BookDetail', () => {
@@ -15,7 +17,7 @@ describe('BookDetail', () => {
 
   const bookServiceMock = {
     getBook: vi.fn((_id: string) => of(createBook({ available: true }))),
-    updateBook: vi.fn((_id: string, _book: ReturnType<typeof createBook>) => of(createBook({ available: true }))),
+    updateBook: vi.fn((_id: string, _book: Book) => of(createBook({ available: true }))),
     deleteBook: vi.fn((_id: string) => of(undefined)),
   };
 
@@ -88,7 +90,7 @@ describe('BookDetail', () => {
     component.bookLoadFailed = false;
 
     expect(component.availabilityState).toBe('available');
-    expect(component.bookStatusLabel).toBe('\u0045\u006c\u00e9\u0072\u0068\u0065\u0074\u0151');
+    expect(component.bookStatusLabel).toBe(BOOK_AVAILABILITY_LABELS.available);
     expect(component.showLoanForm).toBe(true);
     expect(component.showLoanTerminationButton).toBe(false);
     expect(component.canDeleteBook).toBe(true);
@@ -112,17 +114,31 @@ describe('BookDetail', () => {
     expect(component.canDeleteBook).toBe(false);
   });
 
+  it('should keep the loan form hidden while a loaned book awaits its active loan details', () => {
+    component.book = createBook({
+      available: false,
+      hasActiveLoan: true,
+      activeLoan: null,
+    });
+    component.activeLoan = undefined;
+    component.hasActiveLoanConflict = false;
+    component.loanLoading = false;
+
+    expect(component.showLoanForm).toBe(false);
+    expect(component.showLoanTerminationButton).toBe(false);
+  });
+
   it('should expose a borrowed status label when the book has an active loan', () => {
     component.book = createBook({ available: false, hasActiveLoan: true });
 
-    expect(component.bookStatusLabel).toBe('Kikölcsönözve');
+    expect(component.bookStatusLabel).toBe(BOOK_AVAILABILITY_LABELS.loaned);
     expect(component.availabilityState).toBe('loaned');
   });
 
   it('should expose an unavailable status label when the book is manually unavailable', () => {
     component.book = createBook({ available: false, hasActiveLoan: false });
 
-    expect(component.bookStatusLabel).toBe('Nem elérhető');
+    expect(component.bookStatusLabel).toBe(BOOK_AVAILABILITY_LABELS.unavailable);
     expect(component.availabilityState).toBe('unavailable');
   });
 
@@ -157,6 +173,13 @@ describe('BookDetail', () => {
     expect(component.showLoanForm).toBe(false);
   });
 
+  it('should keep the loan form read-only while loan details are loading', () => {
+    component.book = createBook({ available: false, hasActiveLoan: true });
+    component.loanLoading = true;
+
+    expect(component.isLoanFormReadOnly).toBe(true);
+  });
+
   it('should load active loan details when the book is loaned but metadata is missing', () => {
     component.book = createBook({ available: false, hasActiveLoan: true });
     loanServiceMock.getActiveLoanForBook = () => of(createActiveLoan());
@@ -181,7 +204,7 @@ describe('BookDetail', () => {
 
   it('should persist the changed availability only when saving the form', () => {
     component.book = createBook({ available: true, hasActiveLoan: false });
-    const updateBookSpy = bookServiceMock.updateBook.mockImplementationOnce((_id: string, book: ReturnType<typeof createBook>) => of(createBook({
+    const updateBookSpy = bookServiceMock.updateBook.mockImplementationOnce((_id: string, book: Book) => of(createBook({
       available: book.available ?? true,
       hasActiveLoan: false,
     })));
@@ -198,7 +221,6 @@ describe('BookDetail', () => {
       queryParams: expect.any(Object),
       state: { systemMessage: 'A könyv mentése sikeres.' },
     });
-
   });
 
   it('should handle availability conflict during save by switching to the loaned state', () => {
@@ -213,6 +235,25 @@ describe('BookDetail', () => {
     expect(component.book?.available).toBe(false);
     expect(component.availabilityState).toBe('loaned');
     expect(component.errorMessage).toBe('Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.');
+    expect(component.activeLoan?._id).toBe('loan-1');
+
+    loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
+  });
+
+  it('should handle structured active-loan conflict codes during save', () => {
+    component.book = createBook({ available: true, hasActiveLoan: false });
+    bookServiceMock.updateBook.mockImplementationOnce(() => throwError(() => ({
+      error: {
+        code: 'ACTIVE_LOAN_CONFLICT',
+        message: 'Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.',
+      },
+    })));
+    loanServiceMock.getActiveLoanForBook = () => of(createActiveLoan());
+
+    component.saveBook();
+
+    expect(component.book?.available).toBe(false);
+    expect(component.availabilityState).toBe('loaned');
     expect(component.activeLoan?._id).toBe('loan-1');
 
     loanServiceMock.getActiveLoanForBook = () => of<Loan | undefined>(undefined);
@@ -303,7 +344,7 @@ describe('BookDetail', () => {
   });
 });
 
-function createBook(overrides: Partial<any> = {}) {
+function createBook(overrides: Partial<Book> = {}): Book {
   return {
     _id: '1',
     title: 'Dune',

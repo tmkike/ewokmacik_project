@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using MongoDB.Driver;
 
-record ErrorResponse(string Message);
+record ErrorResponse(string Message, string? Code = null);
 
 sealed record ValidationErrorResponse(string Message, IReadOnlyList<string> Errors) : ErrorResponse(Message);
 

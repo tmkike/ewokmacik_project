@@ -5,7 +5,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, skip } from 'rxjs';
 
-import { Book, BookFilters } from '../../models/book';
+import { Book, BookFilters, BookListResponse } from '../../models/book';
 import { BookService } from '../../services/book.service';
 import { getBookAvailabilityLabel } from '../../shared/book-availability';
 
@@ -18,6 +18,8 @@ import { getBookAvailabilityLabel } from '../../shared/book-availability';
 export class Books implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private successMessageTimeoutId?: ReturnType<typeof setTimeout>;
+  private readonly defaultPageSize = 8;
+  private readonly successMessageDurationMs = 1500;
 
   readonly filterForm = new FormGroup({
     title: new FormControl('', { nonNullable: true }),
@@ -27,6 +29,9 @@ export class Books implements OnInit, OnDestroy {
   });
 
   books: Book[] = [];
+  currentPage = 1;
+  pageSize = this.defaultPageSize;
+  totalCount = 0;
   loading = false;
   errorMessage = '';
   successMessage = '';
@@ -42,14 +47,15 @@ export class Books implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.resetFiltersForPageEntry();
     this.readNavigationMessage();
-    this.loadBooks();
+    this.loadFirstPage();
 
     this.route.queryParamMap.pipe(
       skip(1),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(() => {
-      this.resetFiltersForPageEntry();
-      this.loadBooks();
+      // The refresh query param is used as a lightweight "re-enter the list" signal
+      // after create/update flows, so we intentionally reopen the page in its default state.
+      this.resetFiltersAndLoadFirstPage();
     });
   }
 
@@ -58,20 +64,30 @@ export class Books implements OnInit, OnDestroy {
   }
 
   searchBooks(): void {
-    this.loadBooks();
+    this.loadFirstPage();
   }
 
   clearFilters(): void {
-    this.resetFiltersForPageEntry();
+    this.resetFiltersAndLoadFirstPage();
+  }
+
+  goToPage(page: number): void {
+    if (this.loading || page === this.currentPage || page < 1 || page > this.totalPages) {
+      return;
+    }
+
+    this.currentPage = page;
     this.loadBooks();
   }
 
   openBook(book: Book): void {
     if (!book._id) {
-      this.errorMessage = 'A k\u00f6nyvnek nincs azonos\u00edt\u00f3ja, ez\u00e9rt nem nyithat\u00f3 meg.';
+      this.errorMessage = 'A könyvnek nincs azonosítója, ezért nem nyitható meg.';
       return;
     }
 
+    // Pass the current row state forward so the detail page can render immediately
+    // before it refreshes the book from the backend.
     void this.router.navigate(['/books', book._id], {
       state: { book },
     });
@@ -91,6 +107,37 @@ export class Books implements OnInit, OnDestroy {
       : 'availability availability--unavailable';
   }
 
+  get totalPages(): number {
+    return this.totalCount === 0
+      ? 1
+      : Math.ceil(this.totalCount / this.pageSize);
+  }
+
+  get pageStart(): number {
+    return this.totalCount === 0
+      ? 0
+      : ((this.currentPage - 1) * this.pageSize) + 1;
+  }
+
+  get pageEnd(): number {
+    return this.totalCount === 0
+      ? 0
+      : Math.min(this.currentPage * this.pageSize, this.totalCount);
+  }
+
+  get visiblePages(): number[] {
+    const pages: number[] = [];
+    const startPage = Math.max(1, this.currentPage - 1);
+    const endPage = Math.min(this.totalPages, startPage + 2);
+    const adjustedStartPage = Math.max(1, endPage - 2);
+
+    for (let page = adjustedStartPage; page <= endPage; page += 1) {
+      pages.push(page);
+    }
+
+    return pages;
+  }
+
   private loadBooks(filters: BookFilters = this.createRequestFilters()): void {
     this.loading = true;
     this.errorMessage = '';
@@ -98,22 +145,22 @@ export class Books implements OnInit, OnDestroy {
     this.bookService.getBooks(filters).pipe(
       takeUntilDestroyed(this.destroyRef),
       catchError(() => {
-        this.errorMessage = 'Nem siker\u00fclt bet\u00f6lteni a k\u00f6nyveket.';
-        this.books = [];
+        this.handleBookLoadError();
         return EMPTY;
       }),
     ).subscribe({
       next: (response) => {
-        this.books = response.items;
+        this.applyBooksResponse(response);
       },
       complete: () => {
-        this.loading = false;
-        this.changeDetectorRef.detectChanges();
+        this.finishBookLoad();
       },
     });
   }
 
   private readNavigationMessage(): void {
+    // The flash message may arrive from the current router transition or from the
+    // preserved browser history state after a redirect back to the list.
     const navigationMessage = this.router.getCurrentNavigation()?.extras.state?.['systemMessage']
       ?? history.state?.systemMessage;
 
@@ -133,7 +180,7 @@ export class Books implements OnInit, OnDestroy {
       this.successMessage = '';
       this.successMessageTimeoutId = undefined;
       this.changeDetectorRef.detectChanges();
-    }, 1500);
+    }, this.successMessageDurationMs);
   }
 
   private clearSuccessMessageTimeout(): void {
@@ -144,6 +191,7 @@ export class Books implements OnInit, OnDestroy {
   }
 
   private clearNavigationMessageFromHistory(): void {
+    // Consume the flash message once so back/refresh does not replay stale feedback.
     const nextState = {
       ...history.state,
       systemMessage: undefined,
@@ -152,11 +200,39 @@ export class Books implements OnInit, OnDestroy {
     history.replaceState(nextState, document.title, window.location.href);
   }
 
+  private loadFirstPage(): void {
+    this.currentPage = 1;
+    this.loadBooks();
+  }
+
+  private resetFiltersAndLoadFirstPage(): void {
+    this.resetFiltersForPageEntry();
+    this.loadFirstPage();
+  }
+
+  private applyBooksResponse(response: BookListResponse): void {
+    this.books = response.items;
+    this.currentPage = response.page;
+    this.pageSize = response.pageSize;
+    this.totalCount = response.totalCount;
+  }
+
+  private handleBookLoadError(): void {
+    this.errorMessage = 'Nem sikerült betölteni a könyveket.';
+    this.books = [];
+    this.totalCount = 0;
+  }
+
+  private finishBookLoad(): void {
+    this.loading = false;
+    this.changeDetectorRef.detectChanges();
+  }
+
   private createRequestFilters(): BookFilters {
     const { title, author, genre, available } = this.filterForm.getRawValue();
     const requestFilters: BookFilters = {
-      page: 1,
-      pageSize: 50,
+      page: this.currentPage,
+      pageSize: this.pageSize,
     };
 
     if (title.trim()) {

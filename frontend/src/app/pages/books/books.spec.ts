@@ -16,7 +16,7 @@ describe('Books', () => {
       items: [] as Book[],
       totalCount: 0,
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     })),
   };
 
@@ -45,7 +45,7 @@ describe('Books', () => {
 
     expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     });
     expect(component.books).toEqual([]);
   });
@@ -87,7 +87,7 @@ describe('Books', () => {
       genre: 'Science',
       available: true,
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     });
     expect(component.books).toEqual(filteredBooks);
   });
@@ -105,7 +105,7 @@ describe('Books', () => {
 
     expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     });
   });
 
@@ -125,7 +125,7 @@ describe('Books', () => {
     expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
       available: false,
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     });
     expect(component.books).toEqual(filteredBooks);
   });
@@ -154,9 +154,71 @@ describe('Books', () => {
     });
     expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     });
     expect(component.books).toEqual(loadedBooks);
+  });
+
+  it('should store pagination metadata from the backend response', () => {
+    const secondPageBooks = [createBook({ title: 'Dune' })];
+
+    bookServiceMock.getBooks.mockClear();
+    bookServiceMock.getBooks.mockReturnValueOnce(of({
+      items: secondPageBooks,
+      totalCount: 20,
+      page: 2,
+      pageSize: 8,
+    }));
+
+    component.currentPage = 2;
+    component['loadBooks']();
+
+    expect(component.books).toEqual(secondPageBooks);
+    expect(component.currentPage).toBe(2);
+    expect(component.pageSize).toBe(8);
+    expect(component.totalCount).toBe(20);
+    expect(component.totalPages).toBe(3);
+    expect(component.pageStart).toBe(9);
+    expect(component.pageEnd).toBe(16);
+  });
+
+  it('should go to the requested page when the page number is valid', () => {
+    const thirdPageBooks = [createBook({ title: 'Solaris' })];
+
+    bookServiceMock.getBooks.mockClear();
+    bookServiceMock.getBooks.mockReturnValueOnce(of({
+      items: thirdPageBooks,
+      totalCount: 20,
+      page: 3,
+      pageSize: 8,
+    }));
+
+    component.totalCount = 20;
+    component.pageSize = 8;
+    component.currentPage = 1;
+
+    component.goToPage(3);
+
+    expect(bookServiceMock.getBooks).toHaveBeenCalledWith({
+      page: 3,
+      pageSize: 8,
+    });
+    expect(component.currentPage).toBe(3);
+    expect(component.books).toEqual(thirdPageBooks);
+  });
+
+  it('should ignore invalid page changes', () => {
+    component.totalCount = 20;
+    component.pageSize = 8;
+    component.currentPage = 2;
+    bookServiceMock.getBooks.mockClear();
+
+    component.goToPage(0);
+    component.goToPage(2);
+    component.goToPage(4);
+
+    expect(bookServiceMock.getBooks).not.toHaveBeenCalled();
+    expect(component.currentPage).toBe(2);
   });
 
   it('should clear the success message after 1.5 seconds', () => {
@@ -200,7 +262,7 @@ describe('Books', () => {
       items: books,
       totalCount: books.length,
       page: 1,
-      pageSize: 50,
+      pageSize: 8,
     }));
   }
 });

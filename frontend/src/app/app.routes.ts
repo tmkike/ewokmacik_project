@@ -6,7 +6,6 @@ import { BookDetail } from './pages/book-detail/book-detail';
 import { Books } from './pages/books/books';
 import { Contact } from './pages/contact/contact';
 import { Home } from './pages/home/home';
-import { Mod } from './pages/mod/mod';
 
 export const routes: Routes = [
   {
@@ -18,7 +17,6 @@ export const routes: Routes = [
       { path: 'books', component: Books },
       { path: 'books/:id', component: BookDetail },
       { path: 'contact', component: Contact },
-      { path: 'mod', component: Mod },
       { path: 'add', component: Add },
     ],
   },

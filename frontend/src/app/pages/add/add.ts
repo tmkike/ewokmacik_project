@@ -33,13 +33,14 @@ export class Add {
       }),
     ).subscribe({
       next: () => {
+        // The list page consumes this state as a one-time flash message after redirect.
         void this.router.navigate(['/books'], {
           queryParams: { refresh: Date.now() },
-          state: { systemMessage: '\u0041\u0020\u006b\u0102\u00b6\u006e\u0079\u0076\u0020\u0068\u006f\u007a\u007a\u0102\u02c7\u0061\u0064\u0102\u02c7\u0073\u0061\u0020\u0073\u0069\u006b\u0065\u0072\u0065\u0073\u002e' },
+          state: { systemMessage: 'A könyv hozzáadása sikeres.' },
         });
       },
       error: () => {
-        this.errorMessage = '\u004e\u0065\u006d\u0020\u0073\u0069\u006b\u0065\u0072\u0102\u013d\u006c\u0074\u0020\u0068\u006f\u007a\u007a\u0102\u02c7\u0061\u0064\u006e\u0069\u0020\u0061\u0020\u006b\u0102\u00b6\u006e\u0079\u0076\u0065\u0074\u002e';
+        this.errorMessage = 'Nem sikerült hozzáadni a könyvet.';
       },
     });
   }
