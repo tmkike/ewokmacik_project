@@ -10,8 +10,8 @@ sealed class MongoDbContext
     private IMongoDatabase Database { get; }
     private bool _indexesEnsured;
 
-    public IMongoCollection<LoanDocument> Loans => Database.GetCollection<LoanDocument>("loans");
-    public IMongoCollection<PendingBookReleaseDocument> PendingBookReleases => Database.GetCollection<PendingBookReleaseDocument>("pending_book_releases");
+    public IMongoCollection<LoanDocument> Loans => Database.GetCollection<LoanDocument>(LoanCollectionNames.Loans);
+    public IMongoCollection<PendingBookReleaseDocument> PendingBookReleases => Database.GetCollection<PendingBookReleaseDocument>(LoanCollectionNames.PendingBookReleases);
 
     public async Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
     {
@@ -26,7 +26,7 @@ sealed class MongoDbContext
             {
                 Name = "unique_active_loan_per_book",
                 Unique = true,
-                PartialFilterExpression = Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active"),
+                PartialFilterExpression = Builders<LoanDocument>.Filter.Eq(loan => loan.Status, LoanStatus.Active),
             });
 
         var loansByStatusAndDateIndex = new CreateIndexModel<LoanDocument>(

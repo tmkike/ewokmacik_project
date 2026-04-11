@@ -24,7 +24,7 @@ static class LoanDocumentMapper
             LoanedAt = now,
             DueAt = LoanDateRules.ToUtcDateTime(payload.DueDate),
             ReturnedAt = null,
-            Status = "active",
+            Status = LoanStatus.Active,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -33,8 +33,8 @@ static class LoanDocumentMapper
     public static LoanResponse MapLoanResponse(LoanDocument loan)
     {
         return new LoanResponse(
-            loan.Id.ToString(),
-            loan.BookId.ToString(),
+            LoanObjectIds.ToString(loan.Id),
+            LoanObjectIds.ToString(loan.BookId),
             loan.BookTitle,
             loan.BookAuthor,
             loan.BorrowerName,
@@ -48,13 +48,7 @@ static class LoanDocumentMapper
             loan.UpdatedAt);
     }
 
-    public static string GetFlexibleId(LoanDocument loan, string fieldName)
-    {
-        return fieldName switch
-        {
-            "_id" => loan.Id.ToString(),
-            "bookId" => loan.BookId.ToString(),
-            _ => string.Empty,
-        };
-    }
+    public static string GetLoanId(LoanDocument loan) => LoanObjectIds.ToString(loan.Id);
+
+    public static string GetBookId(LoanDocument loan) => LoanObjectIds.ToString(loan.BookId);
 }

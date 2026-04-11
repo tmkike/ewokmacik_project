@@ -38,11 +38,11 @@ static class LoanApi
 
     private static async Task<IResult> GetActiveLoansAsync(string? bookId, MongoDbContext db, CancellationToken cancellationToken)
     {
-        var filter = Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active");
+        var filter = Builders<LoanDocument>.Filter.Eq(loan => loan.Status, LoanStatus.Active);
 
         if (!string.IsNullOrWhiteSpace(bookId))
         {
-            if (!ObjectId.TryParse(bookId, out var parsedBookId))
+            if (!LoanObjectIds.TryParse(bookId, out var parsedBookId))
             {
                 return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
             }
@@ -74,7 +74,7 @@ static class LoanApi
 
         var payload = validationResult.Payload!;
 
-        if (!ObjectId.TryParse(payload.BookId, out var bookId))
+        if (!LoanObjectIds.TryParse(payload.BookId, out var bookId))
         {
             return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
@@ -93,7 +93,7 @@ static class LoanApi
 
         var reservedBook = reservationResult.Book!;
         var loanDocument = LoanDocumentMapper.CreateLoanDocument(reservedBook, bookId, payload);
-        var loanId = LoanDocumentMapper.GetFlexibleId(loanDocument, "_id");
+        var loanId = LoanDocumentMapper.GetLoanId(loanDocument);
 
         try
         {
@@ -118,7 +118,7 @@ static class LoanApi
         MongoDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!ObjectId.TryParse(id, out var loanId))
+        if (!LoanObjectIds.TryParse(id, out var loanId))
         {
             return Results.BadRequest(new ErrorResponse("Érvénytelen kölcsönzésazonosító."));
         }
@@ -139,7 +139,7 @@ static class LoanApi
             return Results.NotFound(new ErrorResponse("A kölcsönzés nem található."));
         }
 
-        if (!string.Equals(existingLoan.Status, "active", StringComparison.OrdinalIgnoreCase))
+        if (!LoanStatus.IsActive(existingLoan.Status))
         {
             return Results.Conflict(new ErrorResponse("Csak aktív kölcsönzés módosítható."));
         }
@@ -154,7 +154,7 @@ static class LoanApi
         var updatedLoan = await db.Loans.FindOneAndUpdateAsync(
             Builders<LoanDocument>.Filter.And(
                 Builders<LoanDocument>.Filter.Eq(loan => loan.Id, loanId),
-                Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active")),
+                Builders<LoanDocument>.Filter.Eq(loan => loan.Status, LoanStatus.Active)),
             Builders<LoanDocument>.Update
                 .Set(loan => loan.BorrowerName, payload.BorrowerName)
                 .Set(loan => loan.BorrowerEmail, payload.BorrowerEmail)
@@ -176,7 +176,7 @@ static class LoanApi
         BookReleaseSyncService bookReleaseSyncService,
         CancellationToken cancellationToken)
     {
-        if (!ObjectId.TryParse(id, out var loanId))
+        if (!LoanObjectIds.TryParse(id, out var loanId))
         {
             return Results.BadRequest(new ErrorResponse("Érvénytelen kölcsönzésazonosító."));
         }
@@ -197,7 +197,7 @@ static class LoanApi
             return Results.NotFound(new ErrorResponse("A kölcsönzés nem található."));
         }
 
-        if (!string.Equals(existingLoan.Status, "active", StringComparison.OrdinalIgnoreCase))
+        if (!LoanStatus.IsActive(existingLoan.Status))
         {
             return Results.Conflict(new ErrorResponse("A kölcsönzés már le van zárva."));
         }
@@ -212,10 +212,10 @@ static class LoanApi
         var updatedLoan = await db.Loans.FindOneAndUpdateAsync(
             Builders<LoanDocument>.Filter.And(
                 Builders<LoanDocument>.Filter.Eq(loan => loan.Id, loanId),
-                Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active")),
+                Builders<LoanDocument>.Filter.Eq(loan => loan.Status, LoanStatus.Active)),
             Builders<LoanDocument>.Update
                 .Set(loan => loan.ReturnedAt, LoanDateRules.ToUtcDateTime(payload.ReturnedDate))
-                .Set(loan => loan.Status, "returned")
+                .Set(loan => loan.Status, LoanStatus.Returned)
                 .Set(loan => loan.UpdatedAt, DateTime.UtcNow),
             new FindOneAndUpdateOptions<LoanDocument> { ReturnDocument = ReturnDocument.After },
             cancellationToken);
@@ -225,7 +225,7 @@ static class LoanApi
             return Results.Conflict(new ErrorResponse("A kölcsönzés időközben lezárult."));
         }
 
-        var bookId = LoanDocumentMapper.GetFlexibleId(existingLoan, "bookId");
+        var bookId = LoanDocumentMapper.GetBookId(existingLoan);
         var releaseCompleted = await bookReleaseSyncService.ReleaseOrQueueAsync(bookId, id, cancellationToken);
         var response = LoanDocumentMapper.MapLoanResponse(updatedLoan);
 
@@ -237,12 +237,12 @@ static class LoanApi
     private static async Task<IResult> GetActiveLoanBookIdsAsync(MongoDbContext db, CancellationToken cancellationToken)
     {
         var activeLoans = await db.Loans
-            .Find(Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active"))
+            .Find(Builders<LoanDocument>.Filter.Eq(loan => loan.Status, LoanStatus.Active))
             .Project(loan => loan.BookId)
             .ToListAsync(cancellationToken);
 
         var bookIds = activeLoans
-            .Select(bookId => bookId.ToString())
+            .Select(LoanObjectIds.ToString)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -251,14 +251,14 @@ static class LoanApi
 
     private static async Task<IResult> GetActiveLoanForBookAsync(string bookId, MongoDbContext db, CancellationToken cancellationToken)
     {
-        if (!ObjectId.TryParse(bookId, out var parsedBookId))
+        if (!LoanObjectIds.TryParse(bookId, out var parsedBookId))
         {
             return Results.BadRequest(new ErrorResponse("Érvénytelen könyvazonosító."));
         }
 
         var activeLoan = await db.Loans
             .Find(Builders<LoanDocument>.Filter.And(
-                Builders<LoanDocument>.Filter.Eq(loan => loan.Status, "active"),
+                Builders<LoanDocument>.Filter.Eq(loan => loan.Status, LoanStatus.Active),
                 LoanDocumentMapper.BookIdentifierFilter(parsedBookId)))
             .Sort(Builders<LoanDocument>.Sort.Descending(loan => loan.LoanedAt))
             .FirstOrDefaultAsync(cancellationToken);
