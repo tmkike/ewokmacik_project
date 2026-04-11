@@ -4,51 +4,57 @@ static class LoanValidation
 {
     public static (ValidatedLoanCreatePayload? Payload, string[] Errors) ValidateLoanCreatePayload(LoanCreateRequest? request)
     {
-        if (request is null)
+        if (!TryValidateRequestBody(request, out var errors))
         {
-            return (null, ["A kérés törzsének JSON objektumnak kell lennie."]);
+            return (null, errors);
         }
 
-        var errors = new List<string>();
-        var bookId = request.BookId?.Trim() ?? string.Empty;
-        var borrowerName = NormalizeRequiredString(request.BorrowerName);
-        var borrowerEmail = NormalizeRequiredString(request.BorrowerEmail);
-        var notes = NormalizeOptionalString(request.Notes);
+        var bookId = request!.BookId?.Trim() ?? string.Empty;
+        var borrower = ValidateBorrower(request.BorrowerName, request.BorrowerEmail, request.Notes);
+        var dueDate = ValidateRequiredDate(
+            request.DueAt,
+            missingMessage: "A határidő megadása kötelező.",
+            invalidMessage: "A visszahozási határidő érvénytelen. A formátum legyen YYYY-MM-DD.",
+            borrower.Errors);
 
-        if (string.IsNullOrWhiteSpace(bookId)) errors.Add("A bookId megadása kötelező.");
-        if (borrowerName is null) errors.Add("A kölcsönző neve kötelező.");
-        if (borrowerEmail is null) errors.Add("A kölcsönző e-mail-címe kötelező.");
-        else if (!IsValidEmail(borrowerEmail)) errors.Add("A kölcsönző e-mail-címe érvénytelen.");
-        if (string.IsNullOrWhiteSpace(request.DueAt)) errors.Add("A határidő megadása kötelező.");
-        if (!LoanDateRules.TryParseClientDate(request.DueAt, out var dueDate)) errors.Add("A visszahozási határidő érvénytelen. A formátum legyen YYYY-MM-DD.");
-        if (LoanDateRules.TryParseClientDate(request.DueAt, out dueDate) && dueDate < LoanDateRules.GetCurrentUtcDate()) errors.Add("A határidő nem lehet korábbi, mint a mai nap.");
+        if (string.IsNullOrWhiteSpace(bookId))
+        {
+            borrower.Errors.Add("A bookId megadása kötelező.");
+        }
 
-        return errors.Count > 0
-            ? (null, errors.ToArray())
-            : (new ValidatedLoanCreatePayload(bookId, borrowerName!, borrowerEmail!, dueDate, notes), []);
+        if (dueDate is not null && dueDate.Value < LoanDateRules.GetCurrentUtcDate())
+        {
+            borrower.Errors.Add("A határidő nem lehet korábbi, mint a mai nap.");
+        }
+
+        if (dueDate is null || borrower.Errors.Count > 0)
+        {
+            return (null, borrower.Errors.ToArray());
+        }
+
+        return (new ValidatedLoanCreatePayload(bookId, borrower.Name!, borrower.Email!, dueDate.Value, borrower.Notes), []);
     }
 
     public static (ValidatedLoanUpdatePayload? Payload, string[] Errors) ValidateLoanUpdatePayload(LoanUpdateRequest? request)
     {
-        if (request is null)
+        if (!TryValidateRequestBody(request, out var errors))
         {
-            return (null, ["A kérés törzsének JSON objektumnak kell lennie."]);
+            return (null, errors);
         }
 
-        var errors = new List<string>();
-        var borrowerName = NormalizeRequiredString(request.BorrowerName);
-        var borrowerEmail = NormalizeRequiredString(request.BorrowerEmail);
-        var notes = NormalizeOptionalString(request.Notes);
+        var borrower = ValidateBorrower(request!.BorrowerName, request.BorrowerEmail, request.Notes);
+        var dueDate = ValidateRequiredDate(
+            request.DueAt,
+            missingMessage: "A határidő megadása kötelező.",
+            invalidMessage: "A visszahozási határidő érvénytelen. A formátum legyen YYYY-MM-DD.",
+            borrower.Errors);
 
-        if (borrowerName is null) errors.Add("A kölcsönző neve kötelező.");
-        if (borrowerEmail is null) errors.Add("A kölcsönző e-mail-címe kötelező.");
-        else if (!IsValidEmail(borrowerEmail)) errors.Add("A kölcsönző e-mail-címe érvénytelen.");
-        if (string.IsNullOrWhiteSpace(request.DueAt)) errors.Add("A határidő megadása kötelező.");
-        if (!LoanDateRules.TryParseClientDate(request.DueAt, out var dueDate)) errors.Add("A visszahozási határidő érvénytelen. A formátum legyen YYYY-MM-DD.");
+        if (dueDate is null || borrower.Errors.Count > 0)
+        {
+            return (null, borrower.Errors.ToArray());
+        }
 
-        return errors.Count > 0
-            ? (null, errors.ToArray())
-            : (new ValidatedLoanUpdatePayload(borrowerName!, borrowerEmail!, dueDate, notes), []);
+        return (new ValidatedLoanUpdatePayload(borrower.Name!, borrower.Email!, dueDate.Value, borrower.Notes), []);
     }
 
     public static (ValidatedLoanReturnPayload? Payload, string[] Errors) ValidateLoanReturnPayload(LoanReturnRequest? request)
@@ -61,6 +67,69 @@ static class LoanValidation
         return LoanDateRules.TryParseClientDate(request.ReturnedAt, out var returnedDate)
             ? (new ValidatedLoanReturnPayload(returnedDate), [])
             : (null, ["A visszahozás dátuma érvénytelen. A formátum legyen YYYY-MM-DD."]);
+    }
+
+    private static bool TryValidateRequestBody<TRequest>(TRequest? request, out string[] errors)
+        where TRequest : class
+    {
+        if (request is not null)
+        {
+            errors = [];
+            return true;
+        }
+
+        errors = ["A kérés törzsének JSON objektumnak kell lennie."];
+        return false;
+    }
+
+    private static (string? Name, string? Email, string? Notes, List<string> Errors) ValidateBorrower(
+        string? borrowerName,
+        string? borrowerEmail,
+        string? notes)
+    {
+        var errors = new List<string>();
+        var normalizedName = NormalizeRequiredString(borrowerName);
+        var normalizedEmail = NormalizeRequiredString(borrowerEmail);
+        var normalizedNotes = NormalizeOptionalString(notes);
+
+        if (normalizedName is null)
+        {
+            errors.Add("A kölcsönző neve kötelező.");
+        }
+
+        if (normalizedEmail is null)
+        {
+            errors.Add("A kölcsönző e-mail-címe kötelező.");
+        }
+        else if (!IsValidEmail(normalizedEmail))
+        {
+            errors.Add("A kölcsönző e-mail-címe érvénytelen.");
+        }
+
+        return (normalizedName, normalizedEmail, normalizedNotes, errors);
+    }
+
+    private static DateOnly? ValidateRequiredDate(
+        string? value,
+        string missingMessage,
+        string invalidMessage,
+        List<string>? errors = null)
+    {
+        errors ??= [];
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add(missingMessage);
+            return null;
+        }
+
+        if (!LoanDateRules.TryParseClientDate(value, out var parsedDate))
+        {
+            errors.Add(invalidMessage);
+            return null;
+        }
+
+        return parsedDate;
     }
 
     private static string? NormalizeRequiredString(string? value)
