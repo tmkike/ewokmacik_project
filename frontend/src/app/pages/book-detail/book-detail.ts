@@ -22,6 +22,8 @@ type LoanFormModel = {
 
 type AvailabilityState = 'available' | 'unavailable' | 'loaned';
 
+const ACTIVE_LOAN_CONFLICT_CODE = 'ACTIVE_LOAN_CONFLICT';
+
 @Component({
   selector: 'app-book-detail',
   imports: [CommonModule, FormsModule],
@@ -54,6 +56,8 @@ export class BookDetail implements OnInit {
   ) {
     const navigationBook = this.router.getCurrentNavigation()?.extras.state?.['book'] as Book | undefined;
 
+    // Reuse the list row state during navigation so the page can paint immediately
+    // before the detail request refreshes the book from the backend.
     if (navigationBook) {
       this.book = { ...navigationBook };
     }
@@ -79,6 +83,8 @@ export class BookDetail implements OnInit {
   }
 
   get availabilityState(): AvailabilityState {
+    // The UI treats any confirmed or suspected active-loan state as "loaned",
+    // even while the detailed loan payload is still being resolved.
     if (this.activeLoan || this.book?.hasActiveLoan || this.hasActiveLoanConflict) {
       return 'loaned';
     }
@@ -159,7 +165,7 @@ export class BookDetail implements OnInit {
       },
       error: (error: HttpErrorResponse) => {
         this.cancelActiveLoanLookup();
-        // Betöltési hiba után ne maradjon szerkeszthető, régi állapot a képernyőn.
+        // After a failed reload, do not leave stale edit or loan state visible from navigation.
         this.clearLoadedBookState();
         this.bookLoadFailed = true;
         this.errorMessage = this.extractErrorMessage(error, `Nem sikerült betölteni a könyvet. Azonosító: ${id}`);
@@ -179,6 +185,7 @@ export class BookDetail implements OnInit {
       timeout(5000),
     ).subscribe({
       next: (loan) => {
+        // Requests can overlap during reloads, so only the newest lookup may update the screen.
         if (!this.isCurrentActiveLoanLookup(bookId, requestId)) {
           return;
         }
@@ -374,6 +381,8 @@ export class BookDetail implements OnInit {
   }
 
   private syncLoanState(book: Book): void {
+    // A backend can describe the same domain state in multiple ways:
+    // embedded loan payload, active-loan flag only, or a manually unavailable book.
     if (!book._id) {
       this.activeLoan = undefined;
       this.hasActiveLoanConflict = false;
@@ -417,6 +426,7 @@ export class BookDetail implements OnInit {
       return;
     }
 
+    // Preserve already known loan data from the list until the detail reload completes.
     if (this.book.activeLoan) {
       this.applyLoadedActiveLoan(this.book.activeLoan);
       this.cancelActiveLoanLookup();
@@ -506,6 +516,8 @@ export class BookDetail implements OnInit {
           return;
         }
 
+        // Fallback to the broader active-loans query when the per-book endpoint
+        // cannot provide the matching item even though the book is still marked as loaned.
         const fallbackLoan = loans.find((loan) => String(loan.bookId) === bookId);
 
         if (fallbackLoan) {
@@ -555,6 +567,8 @@ export class BookDetail implements OnInit {
       return;
     }
 
+    // Saving "available" can race with a server-side active loan.
+    // In that case we immediately switch the UI back to the loaned path.
     const conflictedBookId = this.book._id;
     this.book = {
       ...this.book,
@@ -570,6 +584,10 @@ export class BookDetail implements OnInit {
   }
 
   private isActiveLoanConflict(error: HttpErrorResponse): boolean {
+    if (error.error?.code === ACTIVE_LOAN_CONFLICT_CODE) {
+      return true;
+    }
+
     const sourceText = [
       error.error?.message,
       ...(Array.isArray(error.error?.errors) ? error.error.errors : []),

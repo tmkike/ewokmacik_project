@@ -9,30 +9,7 @@
   box-shadow: var(--shadow-soft);
   margin: 2rem auto;
   max-width: 760px;
-  overflow: hidden;
   padding: 1.75rem;
-  position: relative;
-  animation: panelReveal var(--motion-base) var(--motion-ease) both;
-  animation-delay: 70ms;
-}
-
-.book-form-card::after {
-  background:
-    linear-gradient(145deg, rgba(21, 94, 117, 0.1), transparent 72%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(20, 35, 48, 0.08) 0 4px,
-      transparent 4px 15px
-    );
-  border-radius: 18px;
-  content: '';
-  height: 5rem;
-  pointer-events: none;
-  position: absolute;
-  right: 1.6rem;
-  top: 1.4rem;
-  transform: rotate(-8deg);
-  width: 7rem;
 }
 
 .book-form-card h1 {
@@ -44,34 +21,6 @@
 form {
   display: grid;
   gap: 1rem;
-}
-
-form > * {
-  animation: panelReveal 620ms var(--motion-ease) both;
-}
-
-form > :nth-child(1) {
-  animation-delay: 120ms;
-}
-
-form > :nth-child(2) {
-  animation-delay: 160ms;
-}
-
-form > :nth-child(3) {
-  animation-delay: 200ms;
-}
-
-form > :nth-child(4) {
-  animation-delay: 240ms;
-}
-
-form > :nth-child(5) {
-  animation-delay: 280ms;
-}
-
-form > :nth-child(6) {
-  animation-delay: 320ms;
 }
 
 label {
@@ -87,9 +36,9 @@ label {
   gap: 0.2rem;
 }
 
-.required-marker {
+.required-marker,
+.error {
   color: var(--danger-text);
-  font-weight: 700;
 }
 
 input:not([type='checkbox']),
@@ -103,10 +52,6 @@ input:not([type='checkbox']) {
   color: var(--text-strong);
   min-height: 3rem;
   padding: 0.85rem 0.95rem;
-  transition:
-    border-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease);
 }
 
 input:not([type='checkbox']):focus {
@@ -123,15 +68,6 @@ button {
   font-weight: 800;
   min-height: 3rem;
   padding: 0.85rem 1rem;
-  transition:
-    transform var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-fast) var(--motion-ease),
-    opacity var(--motion-fast) var(--motion-ease);
-}
-
-button:hover:not(:disabled) {
-  box-shadow: 0 14px 24px rgba(21, 94, 117, 0.18);
-  transform: translateY(-2px);
 }
 
 button:disabled {
@@ -141,15 +77,13 @@ button:disabled {
 
 .checkbox-row {
   align-items: center;
-  display: flex;
-  gap: 0.75rem;
   background: rgba(244, 250, 253, 0.82);
   border: 1px solid rgba(214, 228, 238, 0.92);
   border-radius: 18px;
+  display: flex;
+  gap: 0.75rem;
   min-height: 3.25rem;
-  overflow: hidden;
   padding: 0.8rem 1rem;
-  position: relative;
 }
 
 .checkbox-row input[type='checkbox'] {
@@ -159,10 +93,18 @@ button:disabled {
   width: 1.1rem;
 }
 
-.success {
-  color: var(--success-text);
+.error {
+  margin: 1rem 0 0;
 }
 
-.error {
-  color: var(--danger-text);
+@media (max-width: 720px) {
+  .book-form-page {
+    padding: 1.25rem 0.75rem 2rem;
+  }
+
+  .book-form-card {
+    border-radius: 18px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
 }

@@ -21,28 +21,7 @@
   margin-bottom: 1.25rem;
   overflow: hidden;
   padding: 1.75rem;
-  position: relative;
   animation: panelReveal var(--motion-base) var(--motion-ease) both;
-  animation-delay: 40ms;
-}
-
-.catalog-hero::after {
-  background:
-    linear-gradient(90deg, rgba(21, 94, 117, 0.08), rgba(21, 94, 117, 0)),
-    repeating-linear-gradient(
-      90deg,
-      rgba(20, 35, 48, 0.08) 0 4px,
-      transparent 4px 18px
-    );
-  border-radius: 18px;
-  content: '';
-  height: 5.2rem;
-  pointer-events: none;
-  position: absolute;
-  right: 1.75rem;
-  top: 1.35rem;
-  transform: rotate(-8deg);
-  width: 7.4rem;
 }
 
 .catalog-kicker,
@@ -112,7 +91,6 @@
   border-radius: 24px;
   box-shadow: var(--shadow-soft);
   overflow: hidden;
-  position: relative;
 }
 
 .filters-panel {
@@ -123,7 +101,6 @@
   position: sticky;
   top: 1rem;
   animation: panelReveal var(--motion-base) var(--motion-ease) both;
-  animation-delay: 120ms;
 }
 
 .filters-panel__header h2,
@@ -212,7 +189,6 @@
 .catalog-results {
   padding: 1.3rem;
   animation: panelReveal var(--motion-base) var(--motion-ease) both;
-  animation-delay: 200ms;
 }
 
 .results-header {
@@ -237,7 +213,6 @@
   display: inline-flex;
   font-size: 0.82rem;
   font-weight: 800;
-  justify-content: center;
   min-height: 2rem;
   padding: 0.35rem 0.8rem;
   white-space: nowrap;
@@ -264,6 +239,52 @@
   padding: 0;
 }
 
+.pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.pagination__pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: center;
+}
+
+.pagination__button {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text-strong);
+  cursor: pointer;
+  font-weight: 800;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.7rem 0.95rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.pagination__button:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.pagination__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pagination__button--active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
+  box-shadow: 0 14px 24px rgba(21, 94, 117, 0.18);
+  color: #f3fbff;
+}
+
 .book-list-item {
   align-items: center;
   background: linear-gradient(135deg, #ffffff, #eef6fb);
@@ -288,38 +309,6 @@
   border-color: var(--border-strong);
   box-shadow: 0 12px 28px rgba(21, 94, 117, 0.12);
   transform: translateY(-3px);
-}
-
-.book-list-item:nth-child(1) {
-  animation-delay: 110ms;
-}
-
-.book-list-item:nth-child(2) {
-  animation-delay: 140ms;
-}
-
-.book-list-item:nth-child(3) {
-  animation-delay: 170ms;
-}
-
-.book-list-item:nth-child(4) {
-  animation-delay: 200ms;
-}
-
-.book-list-item:nth-child(5) {
-  animation-delay: 230ms;
-}
-
-.book-list-item:nth-child(6) {
-  animation-delay: 260ms;
-}
-
-.book-list-item:nth-child(7) {
-  animation-delay: 290ms;
-}
-
-.book-list-item:nth-child(8) {
-  animation-delay: 320ms;
 }
 
 .book-list-item:focus-visible {
@@ -391,11 +380,8 @@
 .empty-state {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(238, 247, 251, 0.92));
   border: 1px dashed var(--border-strong);
-  overflow: hidden;
-  position: relative;
   text-align: center;
   animation: panelReveal var(--motion-base) var(--motion-ease) both;
-  animation-delay: 180ms;
 }
 
 .empty-state h3 {
@@ -465,5 +451,9 @@
 
   .filter-actions {
     grid-template-columns: 1fr;
+  }
+
+  .pagination {
+    justify-content: center;
   }
 }

@@ -127,6 +127,64 @@ public sealed class GatewayFlowTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task ReturnsStructuredActiveLoanConflictWhenSavingBookAsAvailableThroughGateway()
+    {
+        var createdBook = await CreateBookAsync(new BookUpsertRequest(
+            Title: $"Konfliktus teszt {Guid.NewGuid():N}",
+            Author: "Automata Teszt",
+            Year: 2026,
+            Genre: "Teszt",
+            Available: true));
+
+        string? loanId = null;
+
+        try
+        {
+            var createdLoan = await PostJsonAsync<LoanResponse>(
+                "api/loans",
+                new LoanCreateRequest(
+                    createdBook.Id,
+                    "Teszt Olvasó",
+                    "teszt@example.com",
+                    DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd"),
+                    "Konfliktus szerződés teszt"));
+
+            loanId = createdLoan.Id;
+
+            var borrowedBook = await WaitForBookAsync(
+                createdBook.Id,
+                book => !book.Available && book.HasActiveLoan,
+                timeout: TimeSpan.FromSeconds(12));
+
+            using var response = await _httpClient.PutAsJsonAsync(
+                $"api/books/{createdBook.Id}",
+                new BookUpsertRequest(
+                    borrowedBook.Title,
+                    borrowedBook.Author,
+                    borrowedBook.Year,
+                    borrowedBook.Genre,
+                    Available: true));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+            var error = await ReadJsonAsync<ApiErrorResponse>(response);
+
+            Assert.Equal("ACTIVE_LOAN_CONFLICT", error.Code);
+            Assert.Equal("Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.", error.Message);
+        }
+        finally
+        {
+            if (loanId is not null)
+            {
+                await EnsureLoanReturnedAsync(loanId);
+                await TryWaitForBookAvailabilityAsync(createdBook.Id);
+            }
+
+            await TryDeleteBookAsync(createdBook.Id);
+        }
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync()
@@ -286,4 +344,8 @@ public sealed class GatewayFlowTests : IAsyncLifetime
         [property: JsonPropertyName("_id")] string Id,
         string BookId,
         string Status);
+
+    private sealed record ApiErrorResponse(
+        string Message,
+        string? Code);
 }

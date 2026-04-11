@@ -96,7 +96,10 @@
         <div class="results-header">
           <div>
             <h2>Találatok</h2>
-            <p *ngIf="!loading">{{ books.length }} könyv látható a jelenlegi nézetben.</p>
+            <p *ngIf="!loading && totalCount > 0">
+              {{ totalCount }} könyv található, most a {{ pageStart }}-{{ pageEnd }}. elem látszik.
+            </p>
+            <p *ngIf="!loading && totalCount === 0">Nincs megjeleníthető könyv a jelenlegi nézetben.</p>
             <p *ngIf="loading">A katalógus frissítése folyamatban van.</p>
           </div>
 
@@ -128,6 +131,39 @@
             </button>
           </li>
         </ul>
+
+        <nav class="pagination" *ngIf="!loading && totalPages > 1" aria-label="Lapozás">
+          <button
+            type="button"
+            class="pagination__button"
+            [disabled]="currentPage === 1"
+            (click)="goToPage(currentPage - 1)"
+          >
+            Előző
+          </button>
+
+          <div class="pagination__pages">
+            <button
+              *ngFor="let page of visiblePages"
+              type="button"
+              class="pagination__button"
+              [class.pagination__button--active]="page === currentPage"
+              [attr.aria-current]="page === currentPage ? 'page' : null"
+              (click)="goToPage(page)"
+            >
+              {{ page }}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="pagination__button"
+            [disabled]="currentPage === totalPages"
+            (click)="goToPage(currentPage + 1)"
+          >
+            Következő
+          </button>
+        </nav>
 
         <div class="empty-state" *ngIf="!loading && books.length === 0 && !errorMessage">
           <h3>Nincs megjeleníthető könyv</h3>

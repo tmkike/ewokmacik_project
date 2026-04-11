@@ -1,124 +1,53 @@
-.home-welcome {
-  display: flex;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 2rem 1rem 2.5rem;
+.home-page {
+  padding: 2rem 1.25rem 2.5rem;
 }
 
-.welcome-card {
-  background: var(--surface);
-  border: 1px solid rgba(214, 228, 238, 0.92);
-  border-radius: 28px;
-  box-shadow: var(--shadow-soft);
-  color: var(--text-main);
-  max-width: 1120px;
-  overflow: hidden;
-  padding: 2.8rem 3rem;
-  position: relative;
-  width: 100%;
-  animation: panelReveal var(--motion-base) var(--motion-ease) both;
-  animation-delay: 60ms;
+.home-card {
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 24px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  margin: 0 auto;
+  max-width: 900px;
+  padding: 2rem;
 }
 
-.welcome-card::after {
-  background:
-    linear-gradient(140deg, rgba(21, 94, 117, 0.09), transparent 70%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(20, 35, 48, 0.08) 0 4px,
-      transparent 4px 16px
-    );
-  border-radius: 20px;
-  content: '';
-  height: 5.6rem;
-  pointer-events: none;
-  position: absolute;
-  right: 2rem;
-  top: 1.8rem;
-  transform: rotate(-10deg);
-  width: 8rem;
-}
-
-.welcome-card > * {
-  animation: panelReveal 620ms var(--motion-ease) both;
-}
-
-.welcome-card > :nth-child(1) {
-  animation-delay: 100ms;
-}
-
-.welcome-card > :nth-child(2) {
-  animation-delay: 150ms;
-}
-
-.welcome-card > :nth-child(3) {
-  animation-delay: 190ms;
-}
-
-.welcome-card > :nth-child(4) {
-  animation-delay: 230ms;
-}
-
-.welcome-card > :nth-child(5) {
-  animation-delay: 270ms;
-}
-
-.welcome-card > :nth-child(6) {
-  animation-delay: 310ms;
-}
-
-.welcome-card h1 {
-  color: var(--text-strong);
-  font-size: clamp(2rem, 3vw, 2.8rem);
-  margin-bottom: 1.5rem;
-}
-
-.welcome-card h2 {
+.home-kicker {
   color: var(--accent-strong);
-  font-size: 1.7rem;
-  margin-bottom: 1rem;
-  margin-top: 2rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
 }
 
-.welcome-card p {
-  color: var(--text-main);
-  font-size: 1.08rem;
-  line-height: 1.8;
-  margin-bottom: 1rem;
+.home-card h2 {
+  color: var(--text-strong);
+  margin: 0 0 1rem;
 }
 
-.welcome-card ul {
-  background: rgba(240, 248, 252, 0.82);
-  border: 1px solid rgba(214, 228, 238, 0.92);
-  border-radius: 22px;
-  color: var(--text-main);
-  margin-bottom: 1.2rem;
-  padding: 1.15rem 1.35rem 1.15rem 2.4rem;
-}
-
-.welcome-card li {
+.home-card p,
+.home-card li {
+  color: var(--text-soft);
   line-height: 1.7;
-  margin-bottom: 0.75rem;
 }
 
-.welcome-card li:last-child {
+.home-card ul {
+  margin: 1rem 0;
+  padding-left: 1.25rem;
+}
+
+.home-note {
   margin-bottom: 0;
 }
 
-.intro {
-  color: var(--text-muted);
-  font-size: 1.15rem;
-}
-
-.closing {
-  color: var(--accent-strong);
-  font-weight: 700;
-  margin-top: 1.5rem;
-}
-
 @media (max-width: 720px) {
-  .welcome-card {
-    border-radius: 22px;
-    padding: 1.4rem;
+  .home-page {
+    padding: 1.25rem 0.75rem 2rem;
+  }
+
+  .home-card {
+    border-radius: 18px;
+    padding: 1.5rem;
   }
 }

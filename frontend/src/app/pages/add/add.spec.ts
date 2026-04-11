@@ -3,13 +3,14 @@ import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-import { Add } from './add';
 import { BookService } from '../../services/book.service';
+import { Add } from './add';
 
 describe('Add', () => {
   let component: Add;
   let fixture: ComponentFixture<Add>;
   let router: Router;
+
   const bookServiceMock = {
     addBook: () => of({}),
   };

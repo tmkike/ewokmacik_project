@@ -2,23 +2,19 @@
 
 Ez a mappa a könyvtári rendszer jelenlegi, mikroszervizes változatát tartalmazza.
 
-## Felépítés
+## Áttekintés
 
-- `book-service`: a könyvek listázása, létrehozása, módosítása és törlése
-- `loan-service`: a kölcsönzések kezelése
+A rendszer fő elemei:
+
+- `frontend`: Angular alapú felület
 - `api-gateway`: egységes belépési pont a frontend számára
+- `book-service`: könyvek listázása, létrehozása, módosítása, törlése
+- `loan-service`: kölcsönzések indítása, lekérdezése és lezárása
 - `book-mongodb`: a könyvek adatbázisa
 - `loan-mongodb`: a kölcsönzések adatbázisa
 - `database/book-seed`: a kezdeti könyvlista seed adatai
 - `k8s`: Kubernetes manifestek
-
-## Követelmények
-
-Helyi futtatáshoz ezek szükségesek:
-
-- Docker Desktop
-- Docker Compose
-- .NET 8 SDK
+- `tests/LibrarySystem.StackTests`: gateway-n keresztül futó integrációs tesztek
 
 ## Architektúra
 
@@ -29,7 +25,16 @@ frontend -> api-gateway -> loan-service -> loan-mongodb
 book-service <-> loan-service
 ```
 
-Fontos, hogy a két szolgáltatás már nem olvas közvetlenül egymás adatbázisából. Az állapotok egyeztetése belső HTTP-hívásokkal történik.
+A két backend szolgáltatás nem olvas közvetlenül egymás adatbázisából. Az állapotok egyeztetése belső HTTP-hívásokkal történik.
+
+## Követelmények
+
+Helyi futtatáshoz ezek szükségesek:
+
+- Docker Desktop
+- Docker Compose
+- .NET 8 SDK
+- Node.js és npm, ha a frontendet külön fejlesztői módban is futtatni szeretnéd
 
 ## Indítás Dockerrel
 
@@ -98,6 +103,22 @@ MONGODB_DB=loans
 BOOK_SERVICE_URL=http://localhost:3001
 ```
 
+A frontend külön fejlesztői indításáról a [frontend/README.md](../frontend/README.md) ad részletesebb leírást.
+
+## Fő funkciók
+
+A jelenlegi rendszer az alábbi fő felhasználói folyamatokat támogatja:
+
+- könyvlista megjelenítése szűréssel és lapozással
+- új könyv felvétele
+- könyv adatlap megnyitása
+- könyvadatok módosítása
+- könyv elérhetőségének kezelése
+- kölcsönzés indítása elérhető könyvre
+- aktív kölcsönzés megjelenítése
+- kölcsönzés lezárása
+- nem kölcsönzött könyv törlése
+
 ## REST API
 
 A publikus végpontok az API gateway mögött érhetők el:
@@ -119,7 +140,7 @@ PUT    /api/loans/:id/return
 
 ## Integrációs tesztek
 
-A `tests/LibrarySystem.StackTests` projekt a futó gatewayn keresztül ellenőrzi a fő üzleti folyamatokat.
+A `tests/LibrarySystem.StackTests` projekt a futó gateway-n keresztül ellenőrzi a fő üzleti folyamatokat. Ezek a tesztek akkor hasznosak, ha a stack már elérhető a `http://localhost:3000` címen.
 
 Példa futtatás:
 
@@ -127,11 +148,23 @@ Példa futtatás:
 dotnet test tests/LibrarySystem.StackTests/LibrarySystem.StackTests.csproj
 ```
 
-## Seed adatok
+## CI és image build
 
-A könyvek kezdeti adatai a `database/book-seed` mappából töltődnek be a `book-mongodb` konténer indulásakor.
+A GitHub Actions workflow a [`.github/workflows/docker-build.yml`](../.github/workflows/docker-build.yml) fájlban található.
 
-A `loan-service` külön, üres adatbázissal indul. A kölcsönzési adatok kizárólag a `loan-mongodb` adatbázisban tárolódnak.
+A pipeline:
+
+- felépíti és elindítja a teljes Docker stacket
+- lefuttatja az integrációs teszteket
+- `main` ágra történő push esetén feltölti az image-eket a GitHub Container Registry-be
+
+Az image-ek, amelyekre a Kubernetes manifestek mutatnak:
+
+```text
+ghcr.io/tmkike/ewokmacik_project-frontend:latest
+ghcr.io/tmkike/ewokmacik_project-book-service:latest
+ghcr.io/tmkike/ewokmacik_project-loan-service:latest
+```
 
 ## Kubernetes
 
@@ -143,10 +176,19 @@ Telepítés:
 kubectl apply -k k8s
 ```
 
-Az image-ek, amelyekre a manifestek mutatnak:
+A manifestek a `library-system` namespace-be telepítenek:
 
-```text
-ghcr.io/tmkike/ewokmacik_project-frontend:latest
-ghcr.io/tmkike/ewokmacik_project-book-service:latest
-ghcr.io/tmkike/ewokmacik_project-loan-service:latest
-```
+- frontend
+- api-gateway
+- book-service
+- loan-service
+- book-mongodb
+- loan-mongodb
+
+Az ArgoCD-alapú CD folyamat leírása a [ArgoCD_workflow.md](./ArgoCD_workflow.md) fájlban található.
+
+## Seed adatok
+
+A könyvek kezdeti adatai a `database/book-seed` mappából töltődnek be a `book-mongodb` konténer indulásakor.
+
+A `loan-service` külön, üres adatbázissal indul. A kölcsönzési adatok kizárólag a `loan-mongodb` adatbázisban tárolódnak.

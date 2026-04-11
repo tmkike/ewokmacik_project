@@ -3,6 +3,8 @@ using MongoDB.Driver;
 
 static class BookApi
 {
+    private const string ActiveLoanConflictCode = "ACTIVE_LOAN_CONFLICT";
+
     public static void Map(WebApplication app)
     {
         var books = app.MapGroup("/api/books")
@@ -148,7 +150,9 @@ static class BookApi
 
         if (payload.Available && await loanServiceClient.HasActiveLoanAsync(id, cancellationToken))
         {
-            return Results.Conflict(new ErrorResponse("Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek."));
+            return Results.Conflict(new ErrorResponse(
+                "Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.",
+                ActiveLoanConflictCode));
         }
 
         var updatedBook = await db.Books.FindOneAndUpdateAsync(
@@ -188,7 +192,9 @@ static class BookApi
 
         if (request.Available.Value && await loanServiceClient.HasActiveLoanAsync(id, cancellationToken))
         {
-            return Results.Conflict(new ErrorResponse("Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek."));
+            return Results.Conflict(new ErrorResponse(
+                "Aktív kölcsönzés mellett a könyv nem jelölhető elérhetőnek.",
+                ActiveLoanConflictCode));
         }
 
         var updatedBook = await db.Books.FindOneAndUpdateAsync(
@@ -215,7 +221,9 @@ static class BookApi
 
         if (await loanServiceClient.HasActiveLoanAsync(id, cancellationToken))
         {
-            return Results.Conflict(new ErrorResponse("Aktív kölcsönzés alatt álló könyv nem törölhető."));
+            return Results.Conflict(new ErrorResponse(
+                "Aktív kölcsönzés alatt álló könyv nem törölhető.",
+                ActiveLoanConflictCode));
         }
 
         var result = await db.Books.DeleteOneAsync(
